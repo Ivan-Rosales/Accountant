@@ -1,0 +1,19 @@
+[project]
+name = "accountant"
+version = "1.0.0"
+description = "accountant"
+authors = [
+    {name = "Ivan-Rosales",email = "61328655+Ivan-Rosales@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = "<3.15,>=3.14"
+dependencies = [
+    "pyside6 (>=6.11.0,<7.0.0)",
+    "pysidesix-frameless-window (>=0.8.1,<0.9.0)",
+    "tortoise-orm (>=1.1.7,<2.0.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
