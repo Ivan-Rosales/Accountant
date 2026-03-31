@@ -23,11 +23,6 @@ class DatabaseWorker(QObject):
     def run_task(self, coro_func):
         try:
             result = self.loop.run_until_complete(self.execution(coro_func))
-            print(result)
             self.result.emit(result)
         except Exception as e:
-            print('Exception', str(e))
             self.error.emit(str(e))
-        finally:
-            self.result.disconnect()
-            self.error.disconnect()

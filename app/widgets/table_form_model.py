@@ -26,19 +26,43 @@ class QTableFormModel(BaseWidget):
 
     def create_ui(self):
         self.controllers = QTableFormModelControllers(self)
+
         self.table = QTableModel(self)
+        self.table.table.itemSelectionChanged.connect(self.on_select)
 
     def load_ui(self, layout):
         layout.addWidget(self.controllers)
         layout.addWidget(self.table)
+        self.on_select()
+
+    def on_select(self):
+        selection = self.table.get_selection()
+        self.controllers.update_btn.setEnabled(len(selection) == 1)
+        self.controllers.delete_btn.setEnabled(len(selection) > 0)
 
     def create_fn(self):
         dialog = BaseDialog(self, widget=QFormModel)
+        dialog.widget.save.connect(self.on_save)
         dialog.show()
 
     def update_fn(self):
+        select = self.table.get_selection()[0]
+        row = select.row()
+        instance = self.table.get_row_instance(row)
+
         dialog = BaseDialog(self, widget=QFormModel)
+        dialog.widget.save.connect(self.on_save)
+        dialog.widget.set_instance(instance)
         dialog.show()
 
     def delete_fn(self):
-        pass
+        self.table.delete_selection()
+
+    def on_save(self, data):
+        is_new, instance = data
+
+        if is_new:
+            self.table.create_row(instance)
+        else:
+            row = self.table.get_selection()[0].row()
+            self.table.update_row(row, instance)
