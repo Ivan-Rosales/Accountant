@@ -6,8 +6,8 @@ from db.database import Database
 
 
 class DatabaseWorker(QObject):
-    result = Signal(object)
-    error = Signal(str)
+    result = Signal(list)
+    error = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -20,9 +20,9 @@ class DatabaseWorker(QObject):
         return await coro_func()
 
     @Slot(object)
-    def run_task(self, coro_func):
+    def run_task(self, sender, coro_func):
         try:
             result = self.loop.run_until_complete(self.execution(coro_func))
-            self.result.emit(result)
+            self.result.emit([sender, result])
         except Exception as e:
-            self.error.emit(str(e))
+            self.error.emit([sender, str(e)])

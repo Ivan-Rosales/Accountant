@@ -1,3 +1,4 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout
 
 from app.core.base_dialog import BaseDialog
@@ -23,6 +24,7 @@ class QTableFormModelControllers(BaseWidget):
 
 class QTableFormModel(BaseWidget):
     layout_class = QVBoxLayout
+    list_changed = Signal()
 
     def create_ui(self):
         self.controllers = QTableFormModelControllers(self)
@@ -57,6 +59,7 @@ class QTableFormModel(BaseWidget):
 
     def delete_fn(self):
         self.table.delete_selection()
+        self.list_changed.emit()
 
     def on_save(self, data):
         is_new, instance = data
@@ -66,3 +69,5 @@ class QTableFormModel(BaseWidget):
         else:
             row = self.table.get_selection()[0].row()
             self.table.update_row(row, instance)
+
+        self.list_changed.emit()

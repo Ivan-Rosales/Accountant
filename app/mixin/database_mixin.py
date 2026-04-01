@@ -1,3 +1,4 @@
+from turtledemo.paint import switchupdown
 from typing import Union
 
 from app.core.db_worker import DatabaseWorker
@@ -9,17 +10,23 @@ class DatabaseMixin:
     error_function = None
     result_function = None
 
-    def _on_error(self, *args, **kwargs):
+    def _on_error(self, signal):
+        sender, data = signal
+        if self != sender: return
+
         if callable(self.error_function):
-            self.error_function(*args, **kwargs)
+            self.error_function(data)
         else:
-            print(args, kwargs)
+            print(data)
 
         self.error_function = None
 
-    def _on_success(self, *args, **kwargs):
+    def _on_success(self, signal):
+        sender, data = signal
+        if self != sender: return
+
         if callable(self.result_function):
-            self.result_function(*args, **kwargs)
+            self.result_function(data)
         self.result_function = None
 
     def execute_db(self, coro_func, signals=None):
@@ -31,7 +38,7 @@ class DatabaseMixin:
         db_worker = self.get_worker()
         db_worker.error.connect(self._on_error)
         db_worker.result.connect(self._on_success)
-        self.db_worker.run_task(coro_func)
+        self.db_worker.run_task(self, coro_func)
 
     def get_worker(self) -> Union[DatabaseWorker, None]:
         if self.db_worker is not None:
