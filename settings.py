@@ -2,6 +2,7 @@ import os
 
 from app.logs.logger import logger
 
+QSS_PATH = 'assets/base.qss'
 ICON_PATH = 'assets/icon_16x16.ico'
 
 if not os.path.exists(ICON_PATH):
@@ -10,6 +11,6 @@ if not os.path.exists(ICON_PATH):
 DATABASE = {
     'db_url': "sqlite://db.sqlite3",
     'modules': {
-        'models': ['app.models.client'],
+        'models': ['db.models'],
     }
 }

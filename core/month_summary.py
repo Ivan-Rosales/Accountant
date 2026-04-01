@@ -1,23 +1,42 @@
 import os
+from collections import defaultdict
+from decimal import Decimal, ROUND_HALF_DOWN
 from pathlib import Path
+from typing import Dict
 
 from PySide6.QtWidgets import QMessageBox
 from openpyxl import Workbook
+from openpyxl.styles import Alignment
 
 from app.logs.logger import logger
-from app.models.client import Client
+from core.functions import normalize_number
 from core.xml_file import XmlFile
+from db.models import Client
+
+NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
+DATE_FORMAT = 'dd/mm/yyyy'
 
 
 class MonthSummary:
+    columns_row = 4
+    column_data = 4
+
     def __init__(self, client: Client):
+        self.client = client
+        self.path = None
+
         self.workbook = Workbook()
         self.sheet = self.workbook.active
-        self.client = client
+        self.xml_files: Dict[str:XmlFile] = {}
+
+        self.has_ieps = False
+        self.has_ret_isr = False
+        self.has_ret_iva = False
+        self.rev = False
 
         self.header_set = False
-        self._columns = None
-        self.rev = None
+        self.columns_set = False
+        self.footer_set = False
 
         self.validate()
 
@@ -40,8 +59,11 @@ class MonthSummary:
         files = [i for i in iterdir if i.is_file()]
         xml_paths = [i for i in files if i.suffix == '.xml']
         xml_files = [XmlFile(i) for i in xml_paths]
+        xml_files.sort(key=lambda x: x.date)
 
-        for xml_file in xml_files:
+        self.xml_files = {i.uuid: i for i in xml_files}
+
+        for xml_file in self.xml_files.values():
             self.validate_file(xml_file)
             self.add_file(xml_file)
 
@@ -49,26 +71,120 @@ class MonthSummary:
         kind = self.rev = self.client.rfc == xml.emisor.rfc
 
         self.sheet.cell(row=1, column=1).value = self.client.fullname().upper()
-        self.sheet.cell(row=2, column=1).value = f'concentrado de {'EGRESOS' if kind else 'INGRESOS'}'.upper()
+        self.sheet.cell(row=2, column=1).value = f'concentrado de {'ingresos' if kind else 'egresos'}'.upper()
         self.sheet.cell(row=3, column=1).value = xml.date.strftime('%B %Y').upper()
 
-        print(xml.ieps)
-        print(xml.ieps)
-        print(xml.ieps)
+        self.sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+        self.sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
+        self.sheet.merge_cells(start_row=3, start_column=1, end_row=3, end_column=3)
 
         self.header_set = True
 
+    def set_columns(self, xml: XmlFile):
+        self.has_ieps = any(i.ieps > 0 for i in self.xml_files.values())
+        self.has_ret_isr = any(i.ret_isr > 0 for i in self.xml_files.values())
+        self.has_ret_iva = any(i.ret_iva > 0 for i in self.xml_files.values())
+
+        columns = ['subtotal', 'iva', 'total']
+
+        if self.has_ieps:
+            columns = ['no gravado', 'gravado', 'ieps', 'iva', 'total']
+
+        if self.has_ret_isr or self.has_ret_iva:
+            columns += ['ret iva', 'ret isr', 'neto']
+
+        for column, label in enumerate(columns, self.column_data):
+            self.sheet.cell(row=self.columns_row, column=column).value = label.upper()
+
+        self.columns_set = True
+
     def add_file(self, xml: XmlFile):
         if not self.header_set: self.set_header(xml)
+        if not self.columns_set: self.set_columns(xml)
+
+        if xml.uuid not in self.xml_files:
+            self.xml_files[xml.uuid] = xml
+
+        kind = self.rev
+        row = max([6, self.sheet.max_row + 1])
+
+        self.sheet.cell(row=row, column=1).value = xml.date
+        self.sheet.cell(row=row, column=2).value = (xml.receptor.name if kind else xml.emisor.name).upper()
+        self.sheet.cell(row=row, column=3).value = f'F/{xml.uuid.split('-')[-1]}'.upper()
+
+        gravado = normalize_number(xml.iva * Decimal(6.25) if self.has_ieps else 0, rounding=ROUND_HALF_DOWN)
+        subtotal = xml.total - xml.ieps - xml.iva - gravado
+        total = xml.total
+        ieps = xml.ieps
+        iva = xml.iva
+
+        # delete insignificant values
+        if self.has_ieps and 1.16 < total:
+            if abs(subtotal) < 1 or subtotal < 0:
+                gravado += subtotal
+                subtotal = Decimal(0)
+
+        # type P invoices have no effect
+        if xml.tipo == 'P':
+            subtotal = gravado = ieps = iva = total = Decimal(0)
+
+        # type E invoices have reverse effect
+        if xml.tipo == 'E':
+            subtotal = subtotal * Decimal(-1)
+            gravado = gravado * Decimal(-1)
+            total = total * Decimal(-1)
+            ieps = ieps * Decimal(-1)
+            iva = iva * Decimal(-1)
+
+        column = 4
+        self.sheet.cell(row=row, column=column).value = subtotal
+
+        if self.has_ieps:
+            self.sheet.cell(row=row, column=column + 1).value = gravado
+            self.sheet.cell(row=row, column=column + 2).value = ieps
+            column += 2
+
+        self.sheet.cell(row=row, column=column + 1).value = iva
+        self.sheet.cell(row=row, column=column + 2).value = total
+
+    def set_format(self):
+        for row in range(6, self.sheet.max_row + 1):
+            self.sheet.cell(row=row, column=1).number_format = DATE_FORMAT
+
+        for column in range(self.column_data, self.sheet.max_column + 1):
+            self.sheet.cell(row=self.columns_row, column=column).alignment = Alignment(horizontal="center")
+
+        for row in range(self.columns_row + 2, self.sheet.max_row + 1):
+            for column in range(self.column_data, self.sheet.max_column + 1):
+                self.sheet.cell(row=row, column=column).number_format = NUMBER_FORMAT
+
+    def set_footer(self):
+        min_col = self.column_data
+        max_row = self.sheet.max_row
+        min_row = self.columns_row + 2
+        max_col = self.sheet.max_column
+
+        summaries = defaultdict(Decimal)
+        for row in self.sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                summaries[cell.column] += cell.value
+
+        max_row += 2
+        for column, total in summaries.items():
+            self.sheet.cell(row=max_row, column=column).value = total
 
     def save(self):
-        path = Path('month_summary.xlsx').absolute()
-        self.workbook.save(path)
+        if not self.footer_set: self.set_footer()
+        self.set_format()
 
-        logger.info(f'save month summary in {path}')
+        self.path = Path('month_summary.xlsx').absolute()
+        self.workbook.save(self.path)
 
+        logger.info(f'save month summary in {self.path}')
+
+    def ask_to_open(self):
         buttons = QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        text = f'Se generó correctamente.\n{path}'
+        text = f'Se generó correctamente.\n{self.path}'
         response = QMessageBox.question(None, 'about', text, buttons)
         open_file = response == QMessageBox.StandardButton.Yes
-        if open_file: os.startfile(path)
+        if open_file: os.startfile(self.path)

@@ -1,20 +1,21 @@
 from pathlib import Path
 
 from PySide6.QtCore import QThread
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QComboBox
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout
 
 from app.components.metrics import QMetrics
 from app.core.base_view import BaseView
 from app.core.db_worker import DatabaseWorker
-from app.models.client import Client
+from app.mixin.database_mixin import DatabaseMixin
 from app.widgets.common import QButton
 from app.widgets.file_selector import QFileSelector
 from app.widgets.selector_model import QSelectorModel
 from core.month_summary import MonthSummary
 from core.zip_file import ZipFile
+from db.models import Client
 
 
-class MainView(BaseView):
+class MainView(DatabaseMixin, BaseView):
     layout_class = QVBoxLayout
 
     def __init__(self, *args, **kwargs):
@@ -33,9 +34,13 @@ class MainView(BaseView):
 
         self.footer = QHBoxLayout()
         self.execute_btn = QButton('ejecutar', self, fn=self.execute)
+        self.execute_btn.setProperty('class', 'primary')
         self.footer.addWidget(self.execute_btn)
 
     def load_ui(self, layout):
+        layout.setContentsMargins(10, 25, 10, 10)
+        self.setFixedSize(750, 250)
+
         layout.addWidget(self.client_selector)
         layout.addWidget(self.selector)
 
@@ -43,14 +48,24 @@ class MainView(BaseView):
         layout.addItem(self.footer)
 
     def execute(self):
-        raw_paths = self.selector.get_files()
-        paths = [Path(i) for i in raw_paths]
-        client = self.client_selector.get_current()
+        self.execute_btn.setDisabled(True)
 
-        for path in paths:
-            zipfile = ZipFile(path)
-            data_path = zipfile.extract()
+        try:
+            raw_paths = self.selector.get_files()
+            paths = [Path(i) for i in raw_paths]
+            client = self.client_selector.get_current()
 
-            summary = MonthSummary(client)
-            summary.add_files_in_folder(data_path)
-            summary.save()
+            n_files = len(paths)
+            for path in paths:
+                zipfile = ZipFile(path)
+                data_path = zipfile.extract()
+
+                summary = MonthSummary(client)
+                summary.add_files_in_folder(data_path)
+                summary.save()
+
+                if n_files == 1: summary.ask_to_open()
+
+            self.metrics.update_metrics(n_files)
+        finally:
+            self.execute_btn.setEnabled(True)

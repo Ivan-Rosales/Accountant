@@ -1,4 +1,3 @@
-from turtledemo.paint import switchupdown
 from typing import Union
 
 from app.core.db_worker import DatabaseWorker
@@ -44,7 +43,7 @@ class DatabaseMixin:
         if self.db_worker is not None:
             return self.db_worker
 
-        parent = self.parent()
+        parent = getattr(self, 'parent')()
         while parent is not None:
             if hasattr(parent, 'db_worker'):
                 db_worker = getattr(parent, 'db_worker')

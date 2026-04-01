@@ -13,3 +13,8 @@ class Client(Model):
 
     def __str__(self):
         return f'({self.rfc}) {self.fullname()}'
+
+
+class Metrics(Model):
+    fecha = fields.DateField(unique=True)
+    registers = fields.IntField(default=0)

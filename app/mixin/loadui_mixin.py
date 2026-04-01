@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QBoxLayout
 
 from app.logs.logger import logger
 
@@ -10,6 +10,7 @@ class LoadUiMixin:
         super().__init__(*args, **kwargs)
 
         self.create_ui()
+
         layout = self.layout_class(self)
         self.load_ui(layout)
 
@@ -22,5 +23,5 @@ class LoadUiMixin:
     def create_ui(self):
         logger.warn(f'create_ui is not implemented on {self.__class__.__name__}')
 
-    def load_ui(self, layout):
+    def load_ui(self, layout: QBoxLayout):
         logger.warn(f'load_ui is not implemented on {self.__class__.__name__}')

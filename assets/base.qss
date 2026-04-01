@@ -1,0 +1,49 @@
+/*
+    Colour palette
+    - background #212121
+    - border-radius 8px
+    - color #FFFFFF
+
+    default
+    - background #212121
+
+    hover
+    - background #313131
+
+    pressed
+    - background #353535
+*/
+
+#MainView {
+    background-color: #212121;
+}
+
+QPushButton {
+    background-color: #212121;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QPushButton:hover {
+    background-color: #313131;
+}
+
+QPushButton:pressed {
+    background-color: #353535;
+}
+
+QPushButton:disabled {
+    background-color: #1D1D1D;
+}
+
+QPushButton[class~="primary"] {
+    background-color: #3D6864;
+}
+
+QPushButton[class~="primary"]:hover {
+    background-color: #4D7874;
+}
+
+QPushButton[class~="primary"]:pressed {
+    background-color: #527D79;
+}
