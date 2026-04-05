@@ -14,7 +14,7 @@ class QRowInstance:
 
     def update_row(self, row, instance):
         for col, field in enumerate(self.fields):
-            value = str(getattr(instance, field, None) or '')
+            value = str(getattr(instance, field.name, None) or '')
 
             item = QTableWidgetItem(value)
             if col == 0:

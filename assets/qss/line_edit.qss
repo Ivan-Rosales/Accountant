@@ -1,0 +1,11 @@
+QLineEdit {
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    border-radius: 6px;
+    padding: 6px 8px;
+    outline: none;
+}
+
+QLineEdit:placeholder {
+    color: #666666;
+}

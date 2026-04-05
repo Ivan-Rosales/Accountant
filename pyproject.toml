@@ -10,8 +10,8 @@ requires-python = "<3.15,>=3.14"
 dependencies = [
     "pyside6 (>=6.11.0,<7.0.0)",
     "pysidesix-frameless-window (>=0.8.1,<0.9.0)",
-    "tortoise-orm (>=1.1.7,<2.0.0)",
     "openpyxl (>=3.1.5,<4.0.0)",
+    "sqlalchemy (>=2.0.49,<3.0.0)",
 ]
 
 

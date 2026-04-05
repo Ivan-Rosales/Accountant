@@ -1,18 +1,28 @@
 from PySide6.QtWidgets import QHBoxLayout, QBoxLayout
 
-from app.logs.logger import logger
+from core.logger import logger
 
 
 class LoadUiMixin:
     layout_class = QHBoxLayout
+    windows_size = (700, 300)
+    margin = (0, 0, 0, 0)
+    spacing = 4
+
+    _layout = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.create_ui()
 
-        layout = self.layout_class(self)
-        self.load_ui(layout)
+        self._layout = self.layout_class(self)
+        self._layout.setContentsMargins(*self.margin)
+        self._layout.setSpacing(self.spacing)
+        self.load_ui(self._layout)
+
+        if self.windows_size is not None:
+            self.resize(*self.windows_size)
 
         if hasattr(self, 'titleBar'):
             self.titleBar.raise_()

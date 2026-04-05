@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QLineEdit, QFileDialog
 
+from app.core.base_popup import QDialogException
 from app.core.base_widget import BaseWidget
 
 
@@ -10,7 +11,7 @@ class QFileSelector(BaseWidget):
         self.files = None
 
     def create_ui(self):
-        self.input = QLineEdit(self)
+        self.input = QLineEdit(self, placeholderText='files...')
         self.input.setReadOnly(True)
         self.input.mousePressEvent = self.on_click
 
@@ -19,7 +20,7 @@ class QFileSelector(BaseWidget):
 
     def get_files(self):
         if self.files is None:
-            raise Exception('select almost one file')
+            raise QDialogException(self, 'seleccione al menos un archivo')
 
         return self.files
 

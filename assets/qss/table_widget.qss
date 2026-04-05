@@ -1,0 +1,31 @@
+QHeaderView::section {
+    background-color: #1b1f22;
+    border: 1px solid #1b1f22;
+    border-right-color: #6c757d;
+    border-bottom-color: #6c757d;
+    font-weight: bold;
+}
+
+QTableWidget {
+    background-color: #1b1f22;
+    border: 1px solid #6c757d;
+    gridline-color: #2c353d;
+}
+
+QTableWidget::item {
+    background-color: #1b1f22;
+    border: none;
+}
+
+QTableWidget::item:selected {
+    background-color: #6c757d;
+}
+
+QTableWidget::item:hover {
+    background-color: #6c757d;
+}
+
+QTableWidget::item:focus {
+    outline: none;
+    border: none;
+}

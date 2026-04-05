@@ -4,14 +4,14 @@ from decimal import Decimal, ROUND_HALF_DOWN
 from pathlib import Path
 from typing import Dict
 
-from PySide6.QtWidgets import QMessageBox
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
-from app.logs.logger import logger
+from core.logger import logger
+from core.exceptions import ValidationException
 from core.functions import normalize_number
 from core.xml_file import XmlFile
-from db.models import Client
+from core.models import Cliente
 
 NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
 DATE_FORMAT = 'dd/mm/yyyy'
@@ -21,7 +21,7 @@ class MonthSummary:
     columns_row = 4
     column_data = 4
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Cliente):
         self.client = client
         self.path = None
 
@@ -42,16 +42,16 @@ class MonthSummary:
 
     def validate(self):
         if self.client is None:
-            raise Exception('no client selected')
+            raise ValidationException('No se ha asignado un cliente')
 
     def validate_file(self, xml: XmlFile):
         emisor_rfc = xml.emisor.rfc
         receptor_rfc = xml.receptor.rfc
 
         if self.client.rfc not in [emisor_rfc, receptor_rfc]:
-            raise Exception(
-                f'selected client ({self.client.rfc}) dont correspond with the xml file '
-                f'[{emisor_rfc}, {receptor_rfc}]'
+            raise ValidationException(
+                f'El cliente seleccionado ({self.client.rfc.upper()}) no corresponde con los clientes del xml '
+                f'[{emisor_rfc.upper()}, {receptor_rfc.upper()}]'
             )
 
     def add_files_in_folder(self, path: Path):
@@ -70,7 +70,7 @@ class MonthSummary:
     def set_header(self, xml: XmlFile):
         kind = self.rev = self.client.rfc == xml.emisor.rfc
 
-        self.sheet.cell(row=1, column=1).value = self.client.fullname().upper()
+        self.sheet.cell(row=1, column=1).value = str(self.client).upper()
         self.sheet.cell(row=2, column=1).value = f'concentrado de {'ingresos' if kind else 'egresos'}'.upper()
         self.sheet.cell(row=3, column=1).value = xml.date.strftime('%B %Y').upper()
 
@@ -174,6 +174,9 @@ class MonthSummary:
             self.sheet.cell(row=max_row, column=column).value = total
 
     def save(self):
+        if len(self.xml_files.keys()) == 0:
+            raise ValidationException('El concentrado no tiene archivos')
+
         if not self.footer_set: self.set_footer()
         self.set_format()
 
@@ -182,9 +185,5 @@ class MonthSummary:
 
         logger.info(f'save month summary in {self.path}')
 
-    def ask_to_open(self):
-        buttons = QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        text = f'Se generó correctamente.\n{self.path}'
-        response = QMessageBox.question(None, 'about', text, buttons)
-        open_file = response == QMessageBox.StandardButton.Yes
-        if open_file: os.startfile(self.path)
+    def startfile(self):
+        os.startfile(self.path)

@@ -8,6 +8,8 @@ class BaseWidget(LoadUiMixin, QWidget):
         self.context = kwargs.pop('context', {})
         super().__init__(*args, **kwargs)
 
+        self._dialog = {}
+
     def get_context(self):
         context = self.context
 

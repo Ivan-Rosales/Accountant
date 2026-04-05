@@ -1,0 +1,7 @@
+ QScrollBar::handle {
+     background: #6c757d;
+ }
+
+ QScrollBar::add-page, QScrollBar::sub-page {
+     background: #2c353d;
+ }

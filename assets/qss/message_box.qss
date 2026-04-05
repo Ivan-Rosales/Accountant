@@ -1,0 +1,7 @@
+QMessageBox QDialogButtonBox {
+    min-width: 400px;
+}
+
+QMessageBox > * > QTextEdit {
+    height: 200px;
+}

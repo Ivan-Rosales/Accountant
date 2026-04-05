@@ -1,9 +1,16 @@
-class ModelMixin:
-    def get_model(self):
-        context = self.get_context()
-        return context.get('model')
+from functools import cached_property
 
-    def get_fields(self):
-        model = self.get_model()
-        meta = getattr(model, '_meta')
-        return meta.fields_map
+
+class ModelMixin:
+    _model = None
+
+    @cached_property
+    def model(self):
+        if self._model is None:
+            context = self.get_context()
+            self._model = context.get('model')
+        return self._model
+
+    @cached_property
+    def fields(self):
+        return self.model.__table__.columns

@@ -1,35 +1,48 @@
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QVBoxLayout, QLabel, QSizePolicy, QHBoxLayout
 
 from app.core.base_dialog import BaseDialog
 from app.core.base_widget import BaseWidget
+from app.mixin.model_mixin import ModelMixin
 from app.widgets.common import QButton
 from app.widgets.form_model import QFormModel
 from app.widgets.table_model import QTableModel
 
 
-class QTableFormModelControllers(BaseWidget):
+class QTableFormModelControllers(ModelMixin, BaseWidget):
+    margin = (3, 0, 7, 0)
+    spacing = 0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setObjectName("TableControllers")
+
     def create_ui(self):
         parent = self.parent()
 
-        self.create_btn = QButton('+', self, fn=parent.create_fn)
-        self.update_btn = QButton('x', self, fn=parent.update_fn)
-        self.delete_btn = QButton('-', self, fn=parent.delete_fn)
+        self.label = QLabel(self.model.__name__, self)
+        self.create_btn = QButton('assets/icons/plus-icon.png', self, fn=parent.create_fn)
+        self.create_btn.setProperty('position', 'first')
+        self.update_btn = QButton('assets/icons/pencil-icon.png', self, fn=parent.update_fn)
+        self.update_btn.setProperty('position', 'middle')
+        self.delete_btn = QButton('assets/icons/trash-icon.png', self, fn=parent.delete_fn)
+        self.delete_btn.setProperty('position', 'last')
 
-    def load_ui(self, layout):
+    def load_ui(self, layout: QHBoxLayout):
+        layout.addWidget(self.label, 10)
         layout.addWidget(self.create_btn)
         layout.addWidget(self.update_btn)
         layout.addWidget(self.delete_btn)
 
 
-class QTableFormModel(BaseWidget):
+class QTableFormModel(ModelMixin, BaseWidget):
     layout_class = QVBoxLayout
-    list_changed = Signal()
+    spacing = 0
 
     def create_ui(self):
         self.controllers = QTableFormModelControllers(self)
 
         self.table = QTableModel(self)
+        self.table.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self.table.table.itemSelectionChanged.connect(self.on_select)
 
     def load_ui(self, layout):
@@ -43,8 +56,9 @@ class QTableFormModel(BaseWidget):
         self.controllers.delete_btn.setEnabled(len(selection) > 0)
 
     def create_fn(self):
-        dialog = BaseDialog(self, widget=QFormModel)
-        dialog.widget.save.connect(self.on_save)
+        uuid = f'{self.model.__name__}_create'
+        title = f'crear {self.model.__name__.capitalize()}'
+        dialog = BaseDialog(self, widget=QFormModel, title=title, uuid=uuid)
         dialog.show()
 
     def update_fn(self):
@@ -52,22 +66,11 @@ class QTableFormModel(BaseWidget):
         row = select.row()
         instance = self.table.get_row_instance(row)
 
-        dialog = BaseDialog(self, widget=QFormModel)
-        dialog.widget.save.connect(self.on_save)
+        uuid = f'{self.model.__name__}_update'
+        title = f'actualizar {self.model.__name__.capitalize()} {instance}'
+        dialog = BaseDialog(self, widget=QFormModel, title=title, uuid=uuid)
         dialog.widget.set_instance(instance)
         dialog.show()
 
     def delete_fn(self):
         self.table.delete_selection()
-        self.list_changed.emit()
-
-    def on_save(self, data):
-        is_new, instance = data
-
-        if is_new:
-            self.table.create_row(instance)
-        else:
-            row = self.table.get_selection()[0].row()
-            self.table.update_row(row, instance)
-
-        self.list_changed.emit()
