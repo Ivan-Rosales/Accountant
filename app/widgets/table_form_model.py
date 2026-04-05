@@ -6,6 +6,7 @@ from app.mixin.model_mixin import ModelMixin
 from app.widgets.common import QButton
 from app.widgets.form_model import QFormModel
 from app.widgets.table_model import QTableModel
+from core.functions import get_icon
 
 
 class QTableFormModelControllers(ModelMixin, BaseWidget):
@@ -20,11 +21,11 @@ class QTableFormModelControllers(ModelMixin, BaseWidget):
         parent = self.parent()
 
         self.label = QLabel(self.model.__name__, self)
-        self.create_btn = QButton('assets/icons/plus-icon.png', self, fn=parent.create_fn)
+        self.create_btn = QButton(get_icon('plus'), self, fn=parent.create_fn)
         self.create_btn.setProperty('position', 'first')
-        self.update_btn = QButton('assets/icons/pencil-icon.png', self, fn=parent.update_fn)
+        self.update_btn = QButton(get_icon('pencil'), self, fn=parent.update_fn)
         self.update_btn.setProperty('position', 'middle')
-        self.delete_btn = QButton('assets/icons/trash-icon.png', self, fn=parent.delete_fn)
+        self.delete_btn = QButton(get_icon('trash'), self, fn=parent.delete_fn)
         self.delete_btn.setProperty('position', 'last')
 
     def load_ui(self, layout: QHBoxLayout):

@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem
+from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem, QHeaderView
 
 from app.core.base_widget import BaseWidget
 from app.mixin.model_mixin import ModelMixin

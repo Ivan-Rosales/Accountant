@@ -1,27 +1,23 @@
-from pathlib import Path
-
 from PySide6.QtCore import QThread
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout
+from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
 import settings
-from app.core.base_popup import QDialogException
 from app.core.base_view import BaseView
-from app.messages_box.confirm_box import QConfirmMessageBox
-from app.widgets.common import QButton, spacer
+from app.widgets.common import spacer, QButton
 from app.widgets.debug_tools import QDebugTools
-from app.widgets.file_selector import QFileSelector
-from app.widgets.metrics import QMetrics
 from app.widgets.selector_model import QSelectorModel
 from core.database import database_worker
-from core.exceptions import ValidationException
+from core.functions import get_icon
 from core.models import Cliente
-from core.month_summary import MonthSummary
-from core.zip_file import ZipFile
+from views.client_admin import QClientAdmin
+from views.month_summary_widget import QMonthSummary
 
 
 class MainView(BaseView):
-    layout_class = QVBoxLayout
-    size = (700, 300)
+    layout_class = QGridLayout
+    windows_size = (800, 500)
+    margin = (0, 32, 0, 0)
+    spacing = 0
 
     def __init__(self, *args, **kwargs):
         self.db_thread = QThread()
@@ -29,56 +25,83 @@ class MainView(BaseView):
         self.db_worker.moveToThread(self.db_thread)
         self.db_thread.start()
 
+        self.tabs = {}
+        self.active_tab = None
         super().__init__(*args, **kwargs)
 
     def create_ui(self):
         self.debug_tools = QDebugTools(self)
-
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
-        self.selector = QFileSelector(self, filter="*.zip")
 
-        self.metrics = QMetrics(self)
+        self.header_layout = QVBoxLayout()
+        self.header_layout.addWidget(self.debug_tools)
+        self.header_layout.addWidget(self.client_selector)
+        self.header_layout.setContentsMargins(5, 5, 5, 5)
+        self.header = QWidget()
+        self.header.setObjectName("MainHeader")
+        self.header.setLayout(self.header_layout)
 
-        self.footer = QHBoxLayout()
-        self.execute_btn = QButton('ejecutar', self, fn=self.execute)
-        self.execute_btn.setProperty('class', 'primary')
-        self.footer.addWidget(self.execute_btn)
+        self.buttons_layout = QVBoxLayout()
+        self.buttons_layout.setContentsMargins(0, 5, 5, 5)
+        self.buttons_layout.setSpacing(5)
+        self.buttons = QWidget()
+        self.buttons.setObjectName("MainButtons")
+        self.buttons.setLayout(self.buttons_layout)
 
-    def load_ui(self, layout):
+    def load_ui(self, layout: QGridLayout):
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 1)
+        layout.setRowStretch(0, 0)
+        layout.setRowStretch(1, 1)
+
         if settings.DEBUG:
-            layout.addWidget(self.debug_tools)
+            layout.addWidget(self.header, 0, 0, 1, 2)
 
-        layout.addWidget(self.client_selector)
-        layout.addWidget(self.selector)
+        layout.addWidget(self.buttons, 1, 0)
 
-        layout.addItem(spacer)
+        self.add_tab(get_icon('month'), QMonthSummary())
+        self.add_tab(get_icon('user'), QClientAdmin())
+        self.buttons_layout.addItem(spacer)
+        self.set_current_tab(0)
 
-        layout.addWidget(self.metrics)
-        layout.addItem(self.footer)
+    def add_tab(self, desc, widget):
+        btn = QButton(desc, self, fn=lambda _, key=desc: self.change_current_tab(key))
+        btn.setProperty('class', 'secondary')
 
-    def execute(self):
-        self.execute_btn.setDisabled(True)
+        self.buttons_layout.addWidget(btn)
+        self.tabs[desc] = (btn, widget)
 
-        try:
-            raw_paths = self.selector.get_files()
-            paths = [Path(i) for i in raw_paths]
-            client = self.client_selector.get_current()
+        self._layout.addWidget(widget, 1, 1)
+        widget.hide()
 
-            n_files = len(paths)
-            for path in paths:
-                zipfile = ZipFile(path)
-                data_path = zipfile.extract()
+    def set_current_tab(self, index):
+        key = None
+        if isinstance(index, int):
+            key = list(self.tabs.keys())[index]
+        if isinstance(index, str):
+            key = index
 
-                summary = MonthSummary(client)
-                summary.add_files_in_folder(data_path)
-                summary.save()
+        if key is None: return
+        self.change_current_tab(key)
 
-                if n_files == 1:
-                    message = f'Se generó correctamente.\n{summary.path}\n¿Desea abrirlo?'
-                    QConfirmMessageBox(self, message, summary.startfile)
+    def setPropertyUpddate(self, widget, key, value):
+        widget.setProperty(key, value)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
 
-            self.metrics.add_registers_today(n_files)
-        except ValidationException as error:
-            raise QDialogException(self, str(error), format=False)
-        finally:
-            self.execute_btn.setEnabled(True)
+    def change_current_tab(self, active):
+        to_active_btn = None
+        to_show_widget = None
+
+        for key, (btn, widget) in self.tabs.items():
+            if key == active:
+                to_active_btn = btn
+                to_show_widget = widget
+            else:
+                self.setPropertyUpddate(btn, 'state', '')
+                widget.hide()
+
+        if to_active_btn and to_show_widget:
+            self.setPropertyUpddate(to_active_btn, 'state', 'active')
+            to_show_widget.show()

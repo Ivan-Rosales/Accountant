@@ -1,6 +1,10 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 
+def get_icon(icon):
+    return f'assets/icons/{icon}.png'
+
+
 def decimal_property(func):
     def wrapper_func(*args, **kwargs):
         return normalize_number(Decimal(func(*args, **kwargs)))

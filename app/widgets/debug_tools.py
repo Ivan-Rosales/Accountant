@@ -15,5 +15,10 @@ class QDebugTools(BaseWidget):
 
     def reload_qss(self):
         parent = self.parent()
-        if hasattr(parent, 'load_qss'):
-            parent.load_qss()
+
+        while parent is not None:
+            if hasattr(parent, 'load_qss'):
+                parent.load_qss()
+                break
+
+            parent = parent.parent()
