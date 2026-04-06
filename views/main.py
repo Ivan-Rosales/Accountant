@@ -15,7 +15,7 @@ from views.month_summary_widget import QMonthSummary
 
 class MainView(BaseView):
     layout_class = QGridLayout
-    windows_size = (800, 500)
+    windows_size = (800, 400)
     margin = (0, 32, 0, 0)
     spacing = 0
 

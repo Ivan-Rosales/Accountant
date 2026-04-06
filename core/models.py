@@ -1,10 +1,46 @@
+import re
+
 from sqlalchemy import Column, Integer, String, Date, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base
 
+from app.core.base_popup import QDialogException
 from core.database import engine, database_worker, SessionLocal
 from core.logger import logger
 
 Base = declarative_base()
+
+ERROR_MAPPING = {
+    0: 'error desconocido',
+    2067: 'ya existe un {model} con con el {field} igual a {value}',
+}
+
+
+def catch_query_errors(func):
+    def execution(cls, *args, **kwargs):
+        try:
+            return func(cls, *args, **kwargs)
+        except IntegrityError as e:
+            session = cls.get_session()
+            session.rollback()
+
+            error_code = getattr(e.orig, 'sqlite_errorcode')
+            description = f'¨{ERROR_MAPPING[0]} ({error_code})'
+
+            if error_code in ERROR_MAPPING:
+                message = e.orig.args[0]
+                constraint_match = re.search(r"\.(\w+)$", message)
+                constraint = constraint_match.group(1) if constraint_match else ''
+
+                description = ERROR_MAPPING[error_code].format(
+                    value=kwargs.get(constraint, None),
+                    model=cls.__name__,
+                    field=constraint,
+                )
+
+            raise QDialogException(None, description)
+
+    return execution
 
 
 class ModelMixin:
@@ -49,6 +85,7 @@ class ModelMixin:
         return rows
 
     @classmethod
+    @catch_query_errors
     def real_create(cls, **kwargs):
         session = cls.get_session()
         instance = cls(**kwargs)
@@ -59,6 +96,7 @@ class ModelMixin:
         return instance
 
     @classmethod
+    @catch_query_errors
     def real_get_or_create(cls, **kwargs):
         session = cls.get_session()
         instance = session.execute(select(cls).filter_by(**kwargs)).scalar_one_or_none()
@@ -67,6 +105,7 @@ class ModelMixin:
         return cls.real_create(**kwargs), True
 
     @classmethod
+    @catch_query_errors
     def real_update(cls, **kwargs):
         session = cls.get_session()
         pk = kwargs.pop('id')
@@ -78,6 +117,7 @@ class ModelMixin:
         return instance
 
     @classmethod
+    @catch_query_errors
     def real_delete(cls, instance):
         session = cls.get_session()
         session.delete(instance)
