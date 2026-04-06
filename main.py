@@ -10,6 +10,7 @@ from core.database import database_worker
 from core.functions import get_icon
 from core.models import Cliente
 from views.client_admin import QClientAdmin
+from views.metrics_graph import QMetricsGraph
 from views.month_summary_widget import QMonthSummary
 
 
@@ -19,13 +20,19 @@ class MainView(BaseView):
     margin = (0, 32, 0, 0)
     spacing = 0
 
+    tabs = {
+        'month': QMonthSummary,
+        'plus': QClientAdmin,
+        'graph': QMetricsGraph,
+    }
+
     def __init__(self, *args, **kwargs):
         self.db_thread = QThread()
         self.db_worker = database_worker
         self.db_worker.moveToThread(self.db_thread)
         self.db_thread.start()
 
-        self.tabs = {}
+        self._tabs = {}
         self.active_tab = None
         super().__init__(*args, **kwargs)
 
@@ -34,7 +41,10 @@ class MainView(BaseView):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
 
         self.header_layout = QVBoxLayout()
-        self.header_layout.addWidget(self.debug_tools)
+
+        if settings.DEBUG:
+            self.header_layout.addWidget(self.debug_tools)
+
         self.header_layout.addWidget(self.client_selector)
         self.header_layout.setContentsMargins(5, 5, 5, 5)
         self.header = QWidget()
@@ -54,13 +64,13 @@ class MainView(BaseView):
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
 
-        if settings.DEBUG:
-            layout.addWidget(self.header, 0, 0, 1, 2)
+        layout.addWidget(self.header, 0, 0, 1, 2)
 
         layout.addWidget(self.buttons, 1, 0)
 
-        self.add_tab(get_icon('month'), QMonthSummary())
-        self.add_tab(get_icon('user'), QClientAdmin())
+        for name, widget in self.tabs.items():
+            self.add_tab(get_icon(name), widget())
+
         self.buttons_layout.addItem(spacer)
         self.set_current_tab(0)
 
@@ -69,7 +79,7 @@ class MainView(BaseView):
         btn.setProperty('class', 'secondary')
 
         self.buttons_layout.addWidget(btn)
-        self.tabs[desc] = (btn, widget)
+        self._tabs[desc] = (btn, widget)
 
         self._layout.addWidget(widget, 1, 1)
         widget.hide()
@@ -77,7 +87,7 @@ class MainView(BaseView):
     def set_current_tab(self, index):
         key = None
         if isinstance(index, int):
-            key = list(self.tabs.keys())[index]
+            key = list(self._tabs.keys())[index]
         if isinstance(index, str):
             key = index
 
@@ -94,7 +104,7 @@ class MainView(BaseView):
         to_active_btn = None
         to_show_widget = None
 
-        for key, (btn, widget) in self.tabs.items():
+        for key, (btn, widget) in self._tabs.items():
             if key == active:
                 to_active_btn = btn
                 to_show_widget = widget

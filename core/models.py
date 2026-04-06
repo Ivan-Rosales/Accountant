@@ -1,6 +1,6 @@
 import re
 
-from sqlalchemy import Column, Integer, String, Date, select, update
+from sqlalchemy import Column, Integer, String, Date, select, update, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base
 
@@ -127,12 +127,15 @@ class ModelMixin:
     def real_save(self):
         session = ModelMixin.get_session()
 
-        kwargs = {i.name: getattr(self, i.name) for i in self.__table__.columns}
-        pk = kwargs.pop('id')
+        state = inspect(self)
+        fields = [attr.key for attr in state.attrs if attr.history.has_changes()]
+
+        pk = getattr(self, 'id')
+        kwargs = {field: getattr(self, field) for field in fields}
 
         session.execute(
             update(self.__table__)
-            .where(self.id == pk)
+            .where(self.__class__.id == pk)
             .values(**kwargs)
         )
         session.commit()

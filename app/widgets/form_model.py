@@ -27,6 +27,7 @@ class QFormModel(ModelMixin, BaseWidget):
             self.widgets[name] = field_form()
 
         self.save_btn = QButton('Guardar', self, fn=self.on_save)
+        self.save_btn.setProperty('class', 'primary')
 
     def load_ui(self, layout):
         for name, field in self.widgets.items():

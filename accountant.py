@@ -4,7 +4,7 @@ import sys
 from PySide6 import QtWidgets
 
 from app.core.excepthook import except_hook
-from views.main import MainView
+from main import MainView
 
 if __name__ == "__main__":
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
