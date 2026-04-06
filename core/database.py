@@ -47,7 +47,7 @@ class DatabaseWorker(QObject):
             self.registered_models[model] = rows
 
         values = list(rows.values())
-        logger.info(f'{model.__name__} emit {values}')
+        logger.info(f'{model.__name__} emit {len(values)} rows')
         self.change.emit(model, values)
 
     @model_required

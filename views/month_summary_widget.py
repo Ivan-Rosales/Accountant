@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QVBoxLayout
 
 from app.core.base_popup import QDialogException
 from app.core.base_widget import BaseWidget
-from app.messages_box.confirm_box import QConfirmMessageBox
+from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.common import spacer, QButton
 from app.widgets.file_selector import QFileSelector
 from app.widgets.metrics import QMetrics
@@ -53,6 +53,7 @@ class QMonthSummary(BaseWidget):
                     message = f'Se generó correctamente.\n{summary.path}\n¿Desea abrirlo?'
                     QConfirmMessageBox(self, message, summary.startfile)
 
+            self.selector.clear()
             self.metrics.add_registers_today(n_files)
         except ValidationException as error:
             raise QDialogException(self, str(error), format=False)

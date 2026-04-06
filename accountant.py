@@ -11,6 +11,9 @@ if __name__ == "__main__":
     sys.excepthook = except_hook
 
     app = QtWidgets.QApplication([])
+    app.setOrganizationName("Synop")
+    app.setApplicationName("Accountant")
+
     widget = MainView()
     widget.show()
 

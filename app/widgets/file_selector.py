@@ -18,6 +18,9 @@ class QFileSelector(BaseWidget):
     def load_ui(self, layout):
         layout.addWidget(self.input)
 
+    def clear(self):
+        self.input.clear()
+
     def get_files(self):
         if self.files is None:
             raise QDialogException(self, 'seleccione al menos un archivo')

@@ -12,6 +12,7 @@ from core.models import Cliente
 from views.client_admin import QClientAdmin
 from views.metrics_graph import QMetricsGraph
 from views.month_summary_widget import QMonthSummary
+from views.year_summary_widget import QYearSummary
 
 
 class MainView(BaseView):
@@ -21,8 +22,9 @@ class MainView(BaseView):
     spacing = 0
 
     tabs = {
-        'month': QMonthSummary,
-        'plus': QClientAdmin,
+        'report-3': QMonthSummary,
+        'report': QYearSummary,
+        'user': QClientAdmin,
         'graph': QMetricsGraph,
     }
 
@@ -35,6 +37,9 @@ class MainView(BaseView):
         self._tabs = {}
         self.active_tab = None
         super().__init__(*args, **kwargs)
+
+        default_tab = get_icon('report-3')
+        self.settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
 
     def create_ui(self):
         self.debug_tools = QDebugTools(self)
@@ -72,7 +77,6 @@ class MainView(BaseView):
             self.add_tab(get_icon(name), widget())
 
         self.buttons_layout.addItem(spacer)
-        self.set_current_tab(0)
 
     def add_tab(self, desc, widget):
         btn = QButton(desc, self, fn=lambda _, key=desc: self.change_current_tab(key))
@@ -84,22 +88,6 @@ class MainView(BaseView):
         self._layout.addWidget(widget, 1, 1)
         widget.hide()
 
-    def set_current_tab(self, index):
-        key = None
-        if isinstance(index, int):
-            key = list(self._tabs.keys())[index]
-        if isinstance(index, str):
-            key = index
-
-        if key is None: return
-        self.change_current_tab(key)
-
-    def setPropertyUpddate(self, widget, key, value):
-        widget.setProperty(key, value)
-        widget.style().unpolish(widget)
-        widget.style().polish(widget)
-        widget.update()
-
     def change_current_tab(self, active):
         to_active_btn = None
         to_show_widget = None
@@ -108,6 +96,7 @@ class MainView(BaseView):
             if key == active:
                 to_active_btn = btn
                 to_show_widget = widget
+                self.active_tab = active
             else:
                 self.setPropertyUpddate(btn, 'state', '')
                 widget.hide()

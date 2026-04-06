@@ -1,17 +1,21 @@
 import os
+from calendar import month_name
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_DOWN
+from functools import cached_property
 from pathlib import Path
 from typing import Dict
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment
 
-from core.logger import logger
+from core.configuration import Settings
 from core.exceptions import ValidationException
 from core.functions import normalize_number
-from core.xml_file import XmlFile
+from core.logger import logger
 from core.models import Cliente
+from core.xml_file import XmlFile
+from settings import DEFAULT_WORK_DIR
 
 NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
 DATE_FORMAT = 'dd/mm/yyyy'
@@ -25,20 +29,47 @@ class MonthSummary:
         self.client = client
         self.path = None
 
-        self.workbook = Workbook()
-        self.sheet = self.workbook.active
+        self._workbook = None
+        self._sheet = None
+
         self.xml_files: Dict[str:XmlFile] = {}
 
         self.has_ieps = False
         self.has_ret_isr = False
         self.has_ret_iva = False
-        self.rev = False
-
         self.header_set = False
         self.columns_set = False
         self.footer_set = False
+        self.rev = False
+
+        self.year = None
+        self.month = None
 
         self.validate()
+
+        settings = Settings()
+        self.workdir = settings.value('test', DEFAULT_WORK_DIR)
+
+    @cached_property
+    def workbook(self):
+        if self.filename.exists():
+            workbook = load_workbook(self.filename)
+        else:
+            workbook = Workbook()
+            workbook.remove(workbook.active)
+
+        return workbook
+
+    @cached_property
+    def sheet(self):
+        sheet_name = month_name[self.month].capitalize()
+        return self.workbook.create_sheet(sheet_name)
+
+    @cached_property
+    def filename(self):
+        kind = 'ingresos' if self.rev else 'egresos'
+        filename = f'{self.client.rfc} {self.year} {kind}'.upper()
+        return Path(f'{self.workdir}/{filename}.xlsx')
 
     def validate(self):
         if self.client is None:
@@ -68,10 +99,12 @@ class MonthSummary:
             self.add_file(xml_file)
 
     def set_header(self, xml: XmlFile):
-        kind = self.rev = self.client.rfc == xml.emisor.rfc
+        self.year = xml.date.year
+        self.month = xml.date.month
+        self.rev = self.client.rfc == xml.emisor.rfc
 
         self.sheet.cell(row=1, column=1).value = str(self.client).upper()
-        self.sheet.cell(row=2, column=1).value = f'concentrado de {'ingresos' if kind else 'egresos'}'.upper()
+        self.sheet.cell(row=2, column=1).value = f'concentrado de {'ingresos' if self.rev else 'egresos'}'.upper()
         self.sheet.cell(row=3, column=1).value = xml.date.strftime('%B %Y').upper()
 
         self.sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
@@ -80,7 +113,7 @@ class MonthSummary:
 
         self.header_set = True
 
-    def set_columns(self, xml: XmlFile):
+    def set_columns(self):
         self.has_ieps = any(i.ieps > 0 for i in self.xml_files.values())
         self.has_ret_isr = any(i.ret_isr > 0 for i in self.xml_files.values())
         self.has_ret_iva = any(i.ret_iva > 0 for i in self.xml_files.values())
@@ -100,7 +133,7 @@ class MonthSummary:
 
     def add_file(self, xml: XmlFile):
         if not self.header_set: self.set_header(xml)
-        if not self.columns_set: self.set_columns(xml)
+        if not self.columns_set: self.set_columns()
 
         if xml.uuid not in self.xml_files:
             self.xml_files[xml.uuid] = xml
@@ -173,6 +206,21 @@ class MonthSummary:
         for column, total in summaries.items():
             self.sheet.cell(row=max_row, column=column).value = total
 
+    def transform_sheets(self, sheets: list):
+        order_sheets = []
+        months = [m.capitalize() for m in list(month_name)[1:]]
+
+        for month in months:
+            sheet = next((sheet for sheet in sheets if sheet.title == month), None)
+            if sheet is None: continue
+            order_sheets.append(sheet)
+
+        for sheet in sheets:
+            if sheet not in order_sheets:
+                order_sheets.append(sheet)
+
+        return order_sheets
+
     def save(self):
         if len(self.xml_files.keys()) == 0:
             raise ValidationException('El concentrado no tiene archivos')
@@ -180,10 +228,11 @@ class MonthSummary:
         if not self.footer_set: self.set_footer()
         self.set_format()
 
-        self.path = Path('month_summary.xlsx').absolute()
-        self.workbook.save(self.path)
+        self.filename.parent.mkdir(parents=True, exist_ok=True)
+        self.workbook._sheets = self.transform_sheets(self.workbook._sheets)
+        self.workbook.save(self.filename)
 
-        logger.info(f'save month summary in {self.path}')
+        logger.info(f'save month summary in {self.filename}')
 
     def startfile(self):
-        os.startfile(self.path)
+        os.startfile(self.filename)

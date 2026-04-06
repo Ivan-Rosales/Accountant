@@ -81,7 +81,7 @@ class ModelMixin:
     def real_all(cls):
         session = cls.get_session()
         rows = session.query(cls).all()
-        logger.info(f'{cls.__name__} read {rows}')
+        logger.info(f'{cls.__name__} read {len(rows)} rows')
         return rows
 
     @classmethod
@@ -92,7 +92,7 @@ class ModelMixin:
         session.add(instance)
         session.commit()
         session.refresh(instance)
-        logger.info(f'{cls.__name__} create {instance}')
+        logger.info(f'{cls.__name__} create {instance.id}')
         return instance
 
     @classmethod
@@ -100,7 +100,7 @@ class ModelMixin:
     def real_get_or_create(cls, **kwargs):
         session = cls.get_session()
         instance = session.execute(select(cls).filter_by(**kwargs)).scalar_one_or_none()
-        logger.info(f'{cls.__name__} get_or_create {instance}')
+        logger.info(f'{cls.__name__} get_or_create {instance.id}')
         if instance: return instance, False
         return cls.real_create(**kwargs), True
 
@@ -113,7 +113,7 @@ class ModelMixin:
         for key, value in kwargs.items():
             setattr(instance, key, value)
         session.commit()
-        logger.info(f'{cls.__name__} update.{pk} {instance}')
+        logger.info(f'{cls.__name__} update {instance.id}')
         return instance
 
     @classmethod
@@ -122,7 +122,7 @@ class ModelMixin:
         session = cls.get_session()
         session.delete(instance)
         session.commit()
-        logger.info(f'{cls.__name__} delete {instance}')
+        logger.info(f'{cls.__name__} delete {instance.id}')
 
     def real_save(self):
         session = ModelMixin.get_session()

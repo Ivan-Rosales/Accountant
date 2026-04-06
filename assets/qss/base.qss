@@ -42,3 +42,27 @@
 #TableControllers > QPushButton[position~="last"] {
     border-top-right-radius: 6px;
 }
+
+*[scope~="table"],
+*[scope~="table"]:hover {
+    border: 1px solid #2c353d;
+    border-radius: 0;
+}
+
+*[scope~="table"][corner~="top-left"] {
+    border-top-left-radius: 6px;
+}
+
+*[scope~="table"][corner~="top-right"] {
+    border-top-right-radius: 6px;
+}
+
+*[scope~="table"][corner~="bottom-left"] {
+    border-bottom-left-radius: 6px;
+}
+
+*[scope~="table"][corner~="bottom-right"] {
+    border-bottom-right-radius: 6px;
+}
+
+

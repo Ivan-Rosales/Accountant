@@ -29,8 +29,9 @@ class BaseDialog(WindowMixin, LoadUiMixin, FramelessDialog):
         if is_open: return
 
         open_dialogs[self.uuid] = True
+        print(open_dialogs)
         super().show()
 
-    def hide(self):
+    def closeEvent(self, *args, **kwargs):
+        super().closeEvent(*args, **kwargs)
         open_dialogs[self.uuid] = False
-        super().hide()
