@@ -1,11 +1,16 @@
+from pathlib import Path
+
 from PySide6.QtCore import QObject, Signal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.logger import logger
+from settings import DATABASE_DIR
 
-engine = create_engine("sqlite:///db.sqlite3", echo=False)
+Path(DATABASE_DIR).parent.mkdir(parents=True, exist_ok=True)
+engine = create_engine(f"sqlite:///{DATABASE_DIR}", echo=False)
 SessionLocal = sessionmaker(bind=engine)
+logger.info(f'Database {DATABASE_DIR}')
 
 
 def model_required(func):

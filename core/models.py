@@ -100,9 +100,10 @@ class ModelMixin:
     def real_get_or_create(cls, **kwargs):
         session = cls.get_session()
         instance = session.execute(select(cls).filter_by(**kwargs)).scalar_one_or_none()
+        create = instance is None
+        if create: instance = cls.real_create(**kwargs)
         logger.info(f'{cls.__name__} get_or_create {instance.id}')
-        if instance: return instance, False
-        return cls.real_create(**kwargs), True
+        return instance, create
 
     @classmethod
     @catch_query_errors
