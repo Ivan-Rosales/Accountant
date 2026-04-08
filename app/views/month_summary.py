@@ -67,7 +67,6 @@ class QMonthSummary(AsyncExecutionMixin, BaseWidget):
 
     def on_error(self, error):
         self.execute_btn.setEnabled(True)
-        if not isinstance(error, QDialogException): return
         raise QDialogException(self, str(error), format=False)
 
     def on_success(self, summary, n_files):

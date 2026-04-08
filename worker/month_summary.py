@@ -179,6 +179,8 @@ class MonthSummary:
         self.sheet.cell(row=row, column=column + 1).value = iva
         self.sheet.cell(row=row, column=column + 2).value = total
 
+        logger.info(f'{self} added file {xml.uuid}')
+
     def set_format(self):
         for row in range(6, self.sheet.max_row + 1):
             self.sheet.cell(row=row, column=1).number_format = DATE_FORMAT
