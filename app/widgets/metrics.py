@@ -1,12 +1,15 @@
 from datetime import datetime
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel
 
-from app.core.base_widget import BaseWidget
-from core.models import Metrica
+from base.widget import BaseWidget
+from models import Metrica
 
 
 class QMetrics(BaseWidget):
+    start_signal = Signal()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.today_metrics: Metrica | None = None
@@ -15,7 +18,7 @@ class QMetrics(BaseWidget):
         self.counter = QLabel(self)
         self.counter.setProperty('class', 'secondary')
         Metrica.get_or_create(fecha=datetime.now().date())
-        Metrica.connect_func(self.load_instances)
+        Metrica.on_change(self.load_instances)
 
     def load_ui(self, layout):
         layout.addWidget(self.counter)

@@ -3,9 +3,9 @@ from datetime import datetime
 
 from PySide6.QtWidgets import QGridLayout, QComboBox
 
-from app.core.base_widget import BaseWidget
+from app.core.settings import QSettings
 from app.widgets.common import QButton, spacer
-from core.configuration import Settings
+from base.widget import BaseWidget
 
 
 class QYearSummary(BaseWidget):
@@ -47,7 +47,7 @@ class QYearSummary(BaseWidget):
         self.execute = QButton('ejecutar', self)
         self.execute.setProperty('class', 'primary')
 
-        settings = Settings()
+        settings = QSettings()
 
         func = lambda i: self.years.setCurrentIndex(int(i))
         settings.register_setting('year-selector', self.years.currentIndex, func)

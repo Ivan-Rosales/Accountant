@@ -1,21 +1,20 @@
-from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
 import settings
-from app.core.base_view import BaseView
+from app.core.settings import QSettings
 from app.widgets.common import spacer, QButton
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
-from core.database import database_worker
-from core.functions import get_icon
-from core.models import Cliente
-from views.client_admin import QClientAdmin
-from views.metrics_graph import QMetricsGraph
-from views.month_summary_widget import QMonthSummary
-from views.year_summary_widget import QYearSummary
+from base.window import BaseWindow
+from functions import get_icon
+from models import Cliente
+
+from app.views.month_summary import QMonthSummary
+from app.views.year_summary import QYearSummary
+from app.views.client_admin import QClientAdmin
 
 
-class MainView(BaseView):
+class MainWindow(BaseWindow):
     layout_class = QGridLayout
     windows_size = (800, 400)
     margin = (0, 32, 0, 0)
@@ -25,21 +24,17 @@ class MainView(BaseView):
         'report-3': QMonthSummary,
         'report': QYearSummary,
         'user': QClientAdmin,
-        'graph': QMetricsGraph,
     }
 
     def __init__(self, *args, **kwargs):
-        self.db_thread = QThread()
-        self.db_worker = database_worker
-        self.db_worker.moveToThread(self.db_thread)
-        self.db_thread.start()
-
         self._tabs = {}
         self.active_tab = None
         super().__init__(*args, **kwargs)
 
         default_tab = get_icon('report-3')
-        self.settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
+
+        app_settings = QSettings()
+        app_settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
 
     def create_ui(self):
         self.debug_tools = QDebugTools(self)

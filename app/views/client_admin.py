@@ -1,6 +1,6 @@
-from app.core.base_widget import BaseWidget
 from app.widgets.table_form_model import QTableFormModel
-from core.models import Cliente
+from base.widget import BaseWidget
+from models import Cliente
 
 
 class QClientAdmin(BaseWidget):

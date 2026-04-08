@@ -2,9 +2,9 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout, QLabel, QLineEdit
 from sqlalchemy.sql.sqltypes import String
 
-from app.core.base_widget import BaseWidget
-from app.mixin.model_mixin import ModelMixin
+from app.mixin.model import ModelMixin
 from app.widgets.common import QButton, spacer
+from base.widget import BaseWidget
 
 FIELDS_MAPPING = {
     String: QLineEdit,

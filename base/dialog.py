@@ -2,8 +2,8 @@ from datetime import datetime
 
 from qframelesswindow import FramelessDialog
 
-from app.mixin.loadui_mixin import LoadUiMixin
-from app.mixin.window_mixin import WindowMixin
+from app.mixin.loadui import LoadUiMixin
+from app.mixin.window import WindowMixin
 
 open_dialogs = {}
 
@@ -29,8 +29,11 @@ class BaseDialog(WindowMixin, LoadUiMixin, FramelessDialog):
         if is_open: return
 
         open_dialogs[self.uuid] = True
-        print(open_dialogs)
         super().show()
+
+    def hide(self):
+        super().hide()
+        open_dialogs[self.uuid] = False
 
     def closeEvent(self, *args, **kwargs):
         super().closeEvent(*args, **kwargs)

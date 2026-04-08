@@ -2,7 +2,7 @@ import os
 
 from PySide6.QtCore import QStandardPaths
 
-from core.logger import logger
+from logger import logger
 
 DEBUG = True
 

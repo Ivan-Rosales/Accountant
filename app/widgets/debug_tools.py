@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QVBoxLayout
 
-from app.core.base_widget import BaseWidget
 from app.widgets.common import QButton
+from base.widget import BaseWidget
 
 
 class QDebugTools(BaseWidget):

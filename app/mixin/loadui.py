@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QHBoxLayout, QBoxLayout
 
-from core.logger import logger
+from logger import logger
 
 
 class LoadUiMixin:

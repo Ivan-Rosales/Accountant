@@ -9,13 +9,13 @@ from typing import Dict
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment
 
-from core.configuration import Settings
-from core.exceptions import ValidationException
-from core.functions import normalize_number
-from core.logger import logger
-from core.models import Cliente
-from core.xml_file import XmlFile
+from app.core.settings import QSettings
+from exceptions import ValidationException
+from functions import normalize_number
+from logger import logger
+from models import Cliente
 from settings import DEFAULT_WORK_DIR
+from worker.xml_file import XmlFile
 
 NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
 DATE_FORMAT = 'dd/mm/yyyy'
@@ -27,7 +27,6 @@ class MonthSummary:
 
     def __init__(self, client: Cliente):
         self.client = client
-        self.path = None
 
         self._workbook = None
         self._sheet = None
@@ -47,8 +46,14 @@ class MonthSummary:
 
         self.validate()
 
-        settings = Settings()
+        settings = QSettings()
         self.workdir = settings.value('test', DEFAULT_WORK_DIR)
+
+    @cached_property
+    def filename(self):
+        kind = 'ingresos' if self.rev else 'egresos'
+        filename = f'{self.client.rfc} {self.year} {kind}'.upper()
+        return Path(f'{self.workdir}/{filename}.xlsx')
 
     @cached_property
     def workbook(self):
@@ -64,12 +69,6 @@ class MonthSummary:
     def sheet(self):
         sheet_name = month_name[self.month].capitalize()
         return self.workbook.create_sheet(sheet_name)
-
-    @cached_property
-    def filename(self):
-        kind = 'ingresos' if self.rev else 'egresos'
-        filename = f'{self.client.rfc} {self.year} {kind}'.upper()
-        return Path(f'{self.workdir}/{filename}.xlsx')
 
     def validate(self):
         if self.client is None:

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget
 
-from app.mixin.loadui_mixin import LoadUiMixin
+from app.mixin.loadui import LoadUiMixin
 
 
 class BaseWidget(LoadUiMixin, QWidget):

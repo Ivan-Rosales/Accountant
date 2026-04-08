@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import QVBoxLayout, QLabel, QSizePolicy, QHBoxLayout
 
-from app.core.base_dialog import BaseDialog
-from app.core.base_widget import BaseWidget
-from app.mixin.model_mixin import ModelMixin
+from app.mixin.model import ModelMixin
 from app.widgets.common import QButton
 from app.widgets.form_model import QFormModel
 from app.widgets.table_model import QTableModel
-from core.functions import get_icon
+from base.dialog import BaseDialog
+from base.widget import BaseWidget
+from functions import get_icon
 
 
 class QTableFormModelControllers(ModelMixin, BaseWidget):

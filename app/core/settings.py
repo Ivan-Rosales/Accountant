@@ -1,10 +1,10 @@
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings as QBaseSettings
 
-from core.logger import logger
+from logger import logger
 from settings import ORGANIZATION_NAME, APPLICATION_NAME
 
 
-class Settings(QSettings):
+class QSettings(QBaseSettings):
     _instance = None
     _initialized = False
 
@@ -12,7 +12,7 @@ class Settings(QSettings):
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(Settings, cls).__new__(cls)
+            cls._instance = super(QBaseSettings, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -20,8 +20,9 @@ class Settings(QSettings):
         scope = QSettings.Scope.UserScope
         conf_format = QSettings.Format.IniFormat
         super().__init__(conf_format, scope, ORGANIZATION_NAME, f'{APPLICATION_NAME}\\conf')
-        logger.info(f'Configuration file {self.fileName()}')
         self.__class__._initialized = True
+
+        logger.info(f'Configuration file {self.fileName()}')
 
     def register_setting(self, key, getter, setter, default=None):
         self.widgets[key] = (getter, setter)

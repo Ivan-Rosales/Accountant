@@ -2,7 +2,7 @@ from datetime import datetime
 from functools import cached_property
 from xml.etree.ElementTree import parse, Element
 
-from core.functions import decimal_property
+from functions import decimal_property
 
 
 class XmlNode:

@@ -1,25 +1,27 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox
 
-from app.core.base_widget import BaseWidget
-from app.mixin.model_mixin import ModelMixin
-from core.configuration import Settings
+from app.core.settings import QSettings
+from app.mixin.model import ModelMixin
+from base.widget import BaseWidget
 
 
 class QSelectorModel(ModelMixin, BaseWidget):
+    start_signal = Signal()
+
     def create_ui(self):
         self.list = QComboBox(self)
         self.list.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.model.connect_func(self.load_instances)
+        self.model.on_change(self.load_instances)
         self.lazy_current = None
-
-        settings = Settings()
 
         parent = self.parent()
         parent_name = parent.__class__.__name__
         getter = lambda: getattr(self.get_current(), 'id', None)
         setting_key = f'{parent_name}.selector_{self.model.__name__}'.lower()
-        settings.register_setting(setting_key, getter, self.set_lazy_current, 0)
+
+        app_settings = QSettings()
+        app_settings.register_setting(setting_key, getter, self.set_lazy_current, 0)
 
     def load_ui(self, layout):
         layout.addWidget(self.list)

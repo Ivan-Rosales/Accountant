@@ -3,7 +3,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from core.logger import logger
+from logger import logger
 
 
 class ZipFile:

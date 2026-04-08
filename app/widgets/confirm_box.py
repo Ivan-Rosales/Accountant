@@ -5,7 +5,7 @@ from app.widgets.message_dialog import QMessageDialog
 
 class QConfirmMessageBox(QMessageDialog):
     def __init__(self, parent, message, yes_func=None, no_func=None, **kwargs):
-        kwargs.setdefault('title', 'question')
+        kwargs.setdefault('title', 'Question')
         kwargs.setdefault('icon', QMessageBox.Icon.Question)
         super().__init__(parent)
 

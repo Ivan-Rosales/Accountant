@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from PySide6.QtWidgets import QLineEdit, QFileDialog
 
-from app.core.base_popup import QDialogException
-from app.core.base_widget import BaseWidget
+from base.popup import QDialogException
+from base.widget import BaseWidget
 
 
 class QFileSelector(BaseWidget):
@@ -20,12 +22,13 @@ class QFileSelector(BaseWidget):
 
     def clear(self):
         self.input.clear()
+        self.files = None
 
-    def get_files(self):
+    def get_files(self) -> list[Path]:
         if self.files is None:
             raise QDialogException(self, 'seleccione al menos un archivo')
 
-        return self.files
+        return [Path(i) for i in self.files]
 
     def on_click(self, _):
         file_paths, _ = QFileDialog.getOpenFileNames(filter=self.filter)

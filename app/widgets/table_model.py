@@ -1,12 +1,14 @@
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem, QHeaderView
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem
 
-from app.core.base_widget import BaseWidget
-from app.mixin.model_mixin import ModelMixin
+from app.mixin.model import ModelMixin
 from app.widgets.row_instance import QRowInstance
+from base.widget import BaseWidget
 
 
 class QTableModel(ModelMixin, BaseWidget):
+    start_signal = Signal()
+
     def create_ui(self):
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(self.fields))
@@ -18,7 +20,7 @@ class QTableModel(ModelMixin, BaseWidget):
         self.table.verticalHeader().setVisible(False)
 
         self.row_instance = QRowInstance(self.table, self.fields)
-        self.model.connect_func(self.load_instances)
+        self.model.on_change(self.load_instances)
 
     def load_ui(self, layout):
         layout.addWidget(self.table)

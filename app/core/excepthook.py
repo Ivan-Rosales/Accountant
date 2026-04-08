@@ -1,8 +1,8 @@
 import sys
 import traceback
 
-from app.core.base_popup import QDialogException
 from app.widgets.message_dialog import QMessageDialog
+from base.popup import QDialogException
 
 
 def except_hook(exc_type, exc_value, exc_traceback):

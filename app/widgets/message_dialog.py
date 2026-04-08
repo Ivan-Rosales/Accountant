@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import QMessageBox, QStyle, QLabel, QGridLayout, QHBoxLayout, QPushButton, QTextEdit
 from qframelesswindow import FramelessDialog
 
-from app.mixin.loadui_mixin import LoadUiMixin
-from app.mixin.window_mixin import WindowMixin
+from app.mixin.loadui import LoadUiMixin
+from app.mixin.window import WindowMixin
 from app.widgets.common import spacer
-from core.logger import logger
+from logger import logger
 
 
 class Buttons:

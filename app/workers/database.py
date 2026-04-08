@@ -1,0 +1,114 @@
+from functools import cached_property
+from pathlib import Path
+
+from PySide6.QtCore import QObject, Signal
+from sqlalchemy import create_engine, select, inspect, update
+from sqlalchemy.orm import sessionmaker
+
+from logger import logger
+from settings import DATABASE_DIR
+
+Path(DATABASE_DIR).parent.mkdir(parents=True, exist_ok=True)
+engine = create_engine(f"sqlite:///{DATABASE_DIR}", echo=False)
+SessionLocal = sessionmaker(bind=engine)
+logger.info(f'Database {DATABASE_DIR}')
+
+
+def wrapper_model(register_model, func):
+    def wrapper(emit_model, data):
+        if register_model == emit_model:
+            return func(data)
+        return None
+
+    return wrapper
+
+
+class ModelMixin:
+    @classmethod
+    def on_change(cls, function):
+        database_worker.on_change.connect(wrapper_model(cls, function))
+        database_worker.execute.emit(lambda: database_worker.get_all(cls))
+
+    @classmethod
+    def create(cls, **kwargs):
+        database_worker.execute.emit(lambda: database_worker.create(cls, **kwargs))
+
+    @classmethod
+    def get_or_create(cls, **kwargs):
+        database_worker.execute.emit(lambda: database_worker.get_or_create(cls, **kwargs))
+
+    @classmethod
+    def update(cls, **kwargs):
+        database_worker.execute.emit(lambda: database_worker.update(cls, **kwargs))
+
+    @classmethod
+    def delete(cls, instance):
+        database_worker.execute.emit(lambda: database_worker.delete(cls, instance))
+
+    def save(self, *args, **kwargs):
+        database_worker.execute.emit(lambda: database_worker.save(self, *args, **kwargs))
+
+
+class DatabaseWorker(QObject):
+    execute = Signal(object)
+
+    on_change = Signal(object, list)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.execute.connect(self.on_execute)
+
+    @cached_property
+    def session(self):
+        return SessionLocal()
+
+    def on_execute(self, func):
+        if callable(func): func()
+
+    def get_all(self, model):
+        rows = self.session.query(model).all()
+        self.on_change.emit(model, rows)
+
+    def get_or_create(self, model, **kwargs):
+        instance = self.session.execute(select(model).filter_by(**kwargs)).scalar_one_or_none()
+        create = instance is None
+        if create: self.create(model, **kwargs)
+        self.get_all(model)
+
+    def create(self, model, **kwargs):
+        instance = model(**kwargs)
+        self.session.add(instance)
+        self.session.commit()
+        self.session.refresh(instance)
+        self.get_all(model)
+
+    def update(self, model, **kwargs):
+        pk = kwargs.pop('id')
+        instance = self.session.get(model, pk)
+        for key, value in kwargs.items():
+            setattr(instance, key, value)
+        self.session.commit()
+        self.get_all(model)
+
+    def delete(self, model, instance):
+        self.session.delete(instance)
+        self.session.commit()
+        self.get_all(model)
+
+    def save(self, instance):
+        state = inspect(instance)
+        fields = [attr.key for attr in state.attrs if attr.history.has_changes()]
+
+        pk = getattr(instance, 'id')
+        kwargs = {field: getattr(instance, field) for field in fields}
+
+        self.session.execute(
+            update(instance.__table__)
+            .where(instance.__class__.id == pk)
+            .values(**kwargs)
+        )
+        self.session.commit()
+        self.get_all(instance.__class__)
+
+
+database_worker = DatabaseWorker()
