@@ -12,6 +12,8 @@ class QSelectorModel(ModelMixin, BaseWidget):
     def create_ui(self):
         self.list = QComboBox(self)
         self.list.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.list.view()
+
         self.model.on_change(self.load_instances)
         self.lazy_current = None
 
@@ -22,6 +24,12 @@ class QSelectorModel(ModelMixin, BaseWidget):
 
         app_settings = QSettings()
         app_settings.register_setting(setting_key, getter, self.set_lazy_current, 0)
+
+    def on_change(self, func):
+        def wrapper(index):
+            return func(self.list.itemData(index))
+
+        self.list.currentIndexChanged.connect(wrapper)
 
     def load_ui(self, layout):
         layout.addWidget(self.list)

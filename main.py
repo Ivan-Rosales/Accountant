@@ -2,16 +2,15 @@ from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
 import settings
 from app.core.settings import QSettings
+from app.views.client_admin import QClientAdmin
+from app.views.month_summary import QMonthSummary
+from app.views.year_summary import QYearSummary
 from app.widgets.common import spacer, QButton
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
 from base.window import BaseWindow
 from functions import get_icon
 from models import Cliente
-
-from app.views.month_summary import QMonthSummary
-from app.views.year_summary import QYearSummary
-from app.views.client_admin import QClientAdmin
 
 
 class MainWindow(BaseWindow):
@@ -37,12 +36,12 @@ class MainWindow(BaseWindow):
         app_settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
 
     def create_ui(self):
-        self.debug_tools = QDebugTools(self)
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
 
         self.header_layout = QVBoxLayout()
 
         if settings.DEBUG:
+            self.debug_tools = QDebugTools(self)
             self.header_layout.addWidget(self.debug_tools)
 
         self.header_layout.addWidget(self.client_selector)
@@ -69,7 +68,7 @@ class MainWindow(BaseWindow):
         layout.addWidget(self.buttons, 1, 0)
 
         for name, widget in self.tabs.items():
-            self.add_tab(get_icon(name), widget())
+            self.add_tab(get_icon(name), widget(self))
 
         self.buttons_layout.addItem(spacer)
 

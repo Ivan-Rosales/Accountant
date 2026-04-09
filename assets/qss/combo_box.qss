@@ -8,16 +8,24 @@ QComboBox {
 
 QComboBox QAbstractItemView {
     background-color: #212529;
-    padding: 6px;
+    padding: 2px;
+    outline: 0px;
 }
 
 QComboBox QAbstractItemView::item {
+    border-left: 4px solid transparent;
+    border: 1px solid transparent;
     border-radius: 6px;
-    padding: 1px 2px;
     margin-bottom: 3px;
+    margin-right: 3px;
+    padding-left: 4px;
 }
 
 QComboBox QAbstractItemView::item:hover {
     background-color: #6c757d;
-    border-color: red;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    border: 1px solid #6c757d;
+    border-radius: 6px;
 }

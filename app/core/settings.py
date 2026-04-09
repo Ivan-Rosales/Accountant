@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from PySide6.QtCore import QSettings as QBaseSettings
 
 from logger import logger
-from settings import ORGANIZATION_NAME, APPLICATION_NAME
+from settings import ORGANIZATION_NAME, APPLICATION_NAME, DEFAULT_WORK_DIR
 
 
 class QSettings(QBaseSettings):
@@ -32,3 +34,6 @@ class QSettings(QBaseSettings):
     def get_widget_values(self):
         for key, (getter, setter) in self.widgets.items():
             self.setValue(key, getter())
+
+    def get_workdir(self):
+        return Path(str(self.value('workdir', DEFAULT_WORK_DIR)))

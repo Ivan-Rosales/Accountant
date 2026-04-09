@@ -2,6 +2,7 @@ from datetime import datetime
 from functools import cached_property
 from xml.etree.ElementTree import parse, Element
 
+from exceptions import XmlDataException
 from functions import decimal_property
 
 
@@ -16,6 +17,12 @@ class XmlNode:
     @cached_property
     def name(self):
         return self.element.attrib.get('Nombre', '')
+
+    def __eq__(self, other):
+        return self.rfc == other.rfc
+
+    def __hash__(self):
+        return hash(self.rfc)
 
 
 class XmlFile:
@@ -49,6 +56,7 @@ class XmlFile:
     @cached_property
     def date(self):
         str_date = self.root.attrib.get('Fecha')
+        if str_date is None: raise XmlDataException('cfdi:Comprobante has not attribute Fecha')
         return datetime.fromisoformat(str_date)
 
     @cached_property

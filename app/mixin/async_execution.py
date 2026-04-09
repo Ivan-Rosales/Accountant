@@ -1,5 +1,7 @@
 from PySide6.QtCore import QThread
 
+from logger import logger
+
 
 class AsyncExecutionMixin:
     worker_class = None
@@ -14,6 +16,7 @@ class AsyncExecutionMixin:
             self.worker.start.connect(self.worker.on_start)
 
             if hasattr(self, 'on_success'): self.worker.success.connect(self.on_success)
+            if hasattr(self, 'on_progress'): self.worker.progress.connect(self.on_progress)
             if hasattr(self, 'on_error'): self.worker.error.connect(self.on_error)
 
             self.thread.start()
@@ -24,6 +27,8 @@ class AsyncExecutionMixin:
     def start_worker(self):
         data = self.validate_data()
         if data is None: return
+
+        logger.info(f'{self.__class__.__name__} start, data: {data}')
 
         if isinstance(data, dict):
             self.worker.start.emit(**data)

@@ -44,7 +44,9 @@
 }
 
 *[scope~="table"],
-*[scope~="table"]:hover {
+*[scope~="table"]:hover,
+*[scope~="table"][class~="primary"],
+*[scope~="table"][class~="primary"]:hover {
     border: 1px solid #2c353d;
     border-radius: 0;
 }
@@ -64,5 +66,3 @@
 *[scope~="table"][corner~="bottom-right"] {
     border-bottom-right-radius: 6px;
 }
-
-

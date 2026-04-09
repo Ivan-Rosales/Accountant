@@ -5,9 +5,10 @@ from qframelesswindow import FramelessWindow
 import settings
 from app.core.settings import QSettings
 from app.mixin.loadui import LoadUiMixin
+from app.mixin.property_update import PropertyMixin
 
 
-class BaseWindow(LoadUiMixin, FramelessWindow):
+class BaseWindow(PropertyMixin, LoadUiMixin, FramelessWindow):
     style_sheets = 'assets/qss/*.qss'
 
     def __init__(self, *args, **kwargs):
@@ -34,12 +35,6 @@ class BaseWindow(LoadUiMixin, FramelessWindow):
     def add_style_sheet(self, style_sheet):
         current_style_sheet = self.styleSheet()
         self.setStyleSheet(f'{current_style_sheet}\n{style_sheet}')
-
-    def setPropertyUpddate(self, widget, key, value):
-        widget.setProperty(key, value)
-        widget.style().unpolish(widget)
-        widget.style().polish(widget)
-        widget.update()
 
     def closeEvent(self, event):
         self.app_settings.get_widget_values()

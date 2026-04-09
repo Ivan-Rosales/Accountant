@@ -27,6 +27,10 @@ class ModelMixin:
     @classmethod
     def on_change(cls, function):
         database_worker.on_change.connect(wrapper_model(cls, function))
+        cls.all()
+
+    @classmethod
+    def all(cls):
         database_worker.execute.emit(lambda: database_worker.get_all(cls))
 
     @classmethod

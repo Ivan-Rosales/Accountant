@@ -1,0 +1,34 @@
+QCheckBox {
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    background-color: transparent;
+    border: 1px solid #6c757d;
+    border-radius: 4px;
+    height: 16px;
+    width: 16px;
+}
+
+QCheckBox::indicator:hover {
+    border: 1px solid #565e64;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #0d6efd;
+    border: 1px solid #0d6efd;
+}
+
+QCheckBox::indicator:checked {
+    image: none;
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #0b5ed7;
+    border: 1px solid #0a58ca;
+}
+
+QCheckBox::indicator:checked::after {
+    content: "✔";
+    color: white;
+}

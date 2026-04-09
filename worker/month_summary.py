@@ -1,3 +1,4 @@
+import csv
 import os
 from calendar import month_name
 from collections import defaultdict
@@ -5,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_DOWN
 from functools import cached_property
 from pathlib import Path
 from typing import Dict
+from zipfile import BadZipFile
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment
@@ -14,8 +16,7 @@ from exceptions import ValidationException
 from functions import normalize_number
 from logger import logger
 from models import Cliente
-from settings import DEFAULT_WORK_DIR
-from worker.xml_file import XmlFile
+from worker.xml_file import XmlFile, XmlNode
 
 NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
 DATE_FORMAT = 'dd/mm/yyyy'
@@ -27,6 +28,7 @@ class MonthSummary:
 
     def __init__(self, client: Cliente):
         self.client = client
+        self._file = None
 
         self._workbook = None
         self._sheet = None
@@ -47,18 +49,25 @@ class MonthSummary:
         self.validate()
 
         settings = QSettings()
-        self.workdir = settings.value('test', DEFAULT_WORK_DIR)
+        self.workdir = settings.get_workdir()
+
+    def __str__(self):
+        return f'<MonthSummary year: {self.year} month: {self.month} client: {self.client}/>'
 
     @cached_property
     def filename(self):
+        if self._file is not None: return self._file
         kind = 'ingresos' if self.rev else 'egresos'
         filename = f'{self.client.rfc} {self.year} {kind}'.upper()
-        return Path(f'{self.workdir}/{filename}.xlsx')
+        return Path(f'{self.workdir}/{self.client.rfc}/{filename}.xlsx')
 
     @cached_property
     def workbook(self):
         if self.filename.exists():
-            workbook = load_workbook(self.filename)
+            try:
+                workbook = load_workbook(self.filename)
+            except BadZipFile:
+                raise ValidationException(f'Hay un problema con el archivo\n{self.filename}')
         else:
             workbook = Workbook()
             workbook.remove(workbook.active)
@@ -73,6 +82,9 @@ class MonthSummary:
     def validate(self):
         if self.client is None:
             raise ValidationException('No se ha asignado un cliente')
+
+        if not isinstance(self.client, Cliente):
+            raise Exception('client is not instance of Cliente')
 
     def validate_file(self, xml: XmlFile):
         emisor_rfc = xml.emisor.rfc
@@ -179,7 +191,7 @@ class MonthSummary:
         self.sheet.cell(row=row, column=column + 1).value = iva
         self.sheet.cell(row=row, column=column + 2).value = total
 
-        logger.info(f'{self} added file {xml.uuid}')
+        logger.info(f'{self.__class__.__name__} added file {xml.uuid}')
 
     def set_format(self):
         for row in range(6, self.sheet.max_row + 1):
@@ -222,6 +234,35 @@ class MonthSummary:
 
         return order_sheets
 
+    def from_file(self, filepath):
+        self._file = filepath
+
+    def get_sheet(self, sheet_name):
+        return next((sheet for sheet in self.workbook._sheets if sheet.title == sheet_name), None)
+
+    def generate_providers(self):
+        providers = defaultdict(list)
+        for xml_file in self.xml_files.values():
+            person: XmlNode = xml_file.receptor if self.rev else xml_file.emisor
+            providers[person].append(xml_file)
+
+        kind = 'ingresos' if self.rev else 'egresos'
+        filename = f'{self.client.rfc} {self.year} {self.month} {kind}'.upper()
+        filename = Path(f'{self.workdir}/{self.client.rfc}/proveedores/{filename}.txt')
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        file = open(filename, 'w', newline='')
+
+        try:
+            writer = csv.writer(file, delimiter='|')
+            for person, xml_files in providers.items():
+                row = RowProviders(person, xml_files)
+                writer.writerow(row.csv_row())
+                writer.writerow(row.csv_row())
+        finally:
+            file.close()
+
+        logger.info(f'save month summary providers in {filename}')
+
     def save(self):
         if len(self.xml_files.keys()) == 0:
             raise ValidationException('El concentrado no tiene archivos')
@@ -237,3 +278,28 @@ class MonthSummary:
 
     def startfile(self):
         os.startfile(self.filename)
+
+
+class RowProviders:
+    def __init__(self, client, xml_files):
+        self.client = client
+        self.xml_files = xml_files
+        self.row = [''] * 7 + ['0'] * 47
+        self.set_data()
+
+    def get_total(self):
+        return sum([i.total for i in self.xml_files])
+
+    def get_total_iva(self):
+        return sum([i.iva for i in self.xml_files])
+
+    def set_data(self):
+        self.row[0] = '04'
+        self.row[1] = '85'
+        self.row[2] = self.client.rfc
+        self.row[11] = self.get_total()
+        self.row[21] = self.get_total_iva()
+        self.row[53] = '01'
+
+    def csv_row(self):
+        return self.row
