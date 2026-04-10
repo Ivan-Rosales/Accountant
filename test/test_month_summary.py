@@ -4,8 +4,8 @@ import unittest
 from app.workers.database import SessionLocal
 from core.faker import XmlFileFaker
 from models import Cliente
-from worker.month_summary import MonthSummary
-from worker.xml_file import XmlFile
+from execution.month_summary import MonthSummary
+from execution.xml_file import XmlFile
 
 
 class MonthSummaryTest(unittest.TestCase):

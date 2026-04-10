@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from xml.etree.ElementTree import ElementTree, parse
 
-from worker.xml_file import XmlFile
+from execution.xml_file import XmlFile
 
 
 class XmlFileFaker:

@@ -10,10 +10,10 @@ from app.widgets.file_selector import QFileSelector
 from app.widgets.metrics import QMetrics
 from base.popup import QDialogException
 from base.widget import BaseWidget
+from execution.month_summary import MonthSummary
+from execution.zip_file import ZipFile
 from logger import logger
 from models import Cliente
-from worker.month_summary import MonthSummary
-from worker.zip_file import ZipFile
 
 
 class MonthSummaryWorker(QObject):

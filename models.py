@@ -14,8 +14,11 @@ class Cliente(Base, ModelMixin):
     rfc = Column(String(100), unique=True)
     __tablename__ = "client"
 
+    def fullname(self):
+        return f'{self.nombre} {self.apellido_paterno} {self.apellido_materno}'
+
     def __str__(self):
-        return f'({self.rfc}) {self.nombre} {self.apellido_paterno} {self.apellido_materno}'
+        return f'({self.rfc}) {self.fullname()}'
 
 
 class Metrica(Base, ModelMixin):
