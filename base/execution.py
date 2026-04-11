@@ -6,15 +6,15 @@ from zipfile import BadZipFile
 
 from openpyxl import load_workbook, Workbook
 
-from app.core.settings import QSettings
+from app.core.settings import settings
 from exceptions import ValidationException
 from logger import logger
 
 
 class BaseExecution:
     def __init__(self, *args, **kwargs):
-        self.settings = QSettings()
-        self.workdir = self.settings.get_workdir()
+        self.settings = settings
+        self.workdir = settings.get_workdir()
 
 
 class FileExecution(BaseExecution):

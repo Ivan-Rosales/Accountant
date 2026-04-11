@@ -61,6 +61,8 @@ class MonthSummary(FileExecution):
         if self.filename.exists():
             try:
                 workbook = load_workbook(self.filename)
+            except PermissionError:
+                raise ValidationException(f'Cierre el archivo antes de ejecutar\n{self.filename}')
             except BadZipFile:
                 raise ValidationException(f'Hay un problema con el archivo\n{self.filename}')
         else:
@@ -75,11 +77,8 @@ class MonthSummary(FileExecution):
         return self.workbook.create_sheet(sheet_name)
 
     def validate(self):
-        if self.client is None:
-            raise ValidationException('No se ha asignado un cliente')
-
         if not isinstance(self.client, Cliente):
-            raise Exception('client is not instance of Cliente')
+            raise ValidationException('No se ha asignado un cliente')
 
     def validate_file(self, xml: XmlFile):
         emisor_rfc = xml.emisor.rfc

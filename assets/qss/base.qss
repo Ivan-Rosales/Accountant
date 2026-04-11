@@ -51,18 +51,22 @@
     border-radius: 0;
 }
 
-*[scope~="table"][corner~="top-left"] {
+QPushButton[scope~="table"][corner~="top-left"],
+QPushButton[class~="primary"][scope~="table"][corner~="top-left"] {
     border-top-left-radius: 6px;
 }
 
-*[scope~="table"][corner~="top-right"] {
+QPushButton[scope~="table"][corner~="top-right"],
+QPushButton[class~="primary"][scope~="table"][corner~="top-right"] {
     border-top-right-radius: 6px;
 }
 
-*[scope~="table"][corner~="bottom-left"] {
+QPushButton[scope~="table"][corner~="bottom-left"],
+QPushButton[class~="primary"][scope~="table"][corner~="bottom-left"] {
     border-bottom-left-radius: 6px;
 }
 
-*[scope~="table"][corner~="bottom-right"] {
+QPushButton[scope~="table"][corner~="bottom-right"],
+QPushButton[class~="primary"][scope~="table"][corner~="bottom-right"] {
     border-bottom-right-radius: 6px;
 }

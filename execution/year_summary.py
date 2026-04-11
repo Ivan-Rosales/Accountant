@@ -6,6 +6,7 @@ from pathlib import Path
 from openpyxl.styles import Border, Side
 
 from base.execution import FileExecution
+from exceptions import ValidationException
 from execution.month_summary import MonthSummary
 from logger import logger
 from models import Cliente
@@ -19,11 +20,17 @@ class YearSummary(FileExecution):
 
         self._file = None
 
+        self.validate()
+
     @cached_property
     def filename(self):
         if self._file is not None: return self._file
         filename = f'{self.client.rfc} {self.year}'.upper()
         return Path(f'{self.workdir}/{self.client.rfc}/{filename}.xlsx')
+
+    def validate(self):
+        if not isinstance(self.client, Cliente):
+            raise ValidationException('No se ha asignado un cliente')
 
     def generate_sheet(self, month):
         name = month_name[month].capitalize()
@@ -63,9 +70,17 @@ class YearSummary(FileExecution):
         sheet.cell(row=11, column=1).value = get_totals_label('ingresos').upper()
         sheet.cell(row=12, column=1).value = 'total'.upper()
 
+        sheet.merge_cells(start_row=10, start_column=1, end_row=10, end_column=4)
+        sheet.merge_cells(start_row=11, start_column=1, end_row=11, end_column=4)
+        sheet.merge_cells(start_row=12, start_column=1, end_row=12, end_column=4)
+
         sheet.cell(row=17, column=1).value = f'total de egresos de {name}'.upper()
         sheet.cell(row=18, column=1).value = get_totals_label('egresos').upper()
         sheet.cell(row=19, column=1).value = 'total'.upper()
+
+        sheet.merge_cells(start_row=17, start_column=1, end_row=17, end_column=4)
+        sheet.merge_cells(start_row=18, start_column=1, end_row=18, end_column=4)
+        sheet.merge_cells(start_row=19, start_column=1, end_row=19, end_column=4)
 
         # Iva
         sheet.cell(row=22, column=1).value = 'iva causado'.upper()

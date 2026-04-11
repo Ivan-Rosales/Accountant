@@ -18,6 +18,7 @@ class QTableModel(ModelMixin, BaseWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
+        self.table.setShowGrid(False)
 
         self.row_instance = QRowInstance(self.table, self.fields)
         self.model.on_change(self.load_instances)

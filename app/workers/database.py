@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select, inspect, update
 from sqlalchemy.orm import sessionmaker
 
 from logger import logger
-from settings import DATABASE_DIR
+from app.settings import DATABASE_DIR
 
 Path(DATABASE_DIR).parent.mkdir(parents=True, exist_ok=True)
 engine = create_engine(f"sqlite:///{DATABASE_DIR}", echo=False)

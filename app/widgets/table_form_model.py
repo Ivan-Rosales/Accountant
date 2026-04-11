@@ -45,6 +45,7 @@ class QTableFormModel(ModelMixin, BaseWidget):
         self.table = QTableModel(self)
         self.table.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self.table.table.itemSelectionChanged.connect(self.on_select)
+        self.table.table.doubleClicked.connect(self.update_fn)
 
     def load_ui(self, layout):
         layout.addWidget(self.controllers)
@@ -62,9 +63,13 @@ class QTableFormModel(ModelMixin, BaseWidget):
         dialog = BaseDialog(self, widget=QFormModel, title=title, uuid=uuid)
         dialog.show()
 
-    def update_fn(self):
-        select = self.table.get_selection()[0]
-        row = select.row()
+    def update_fn(self, index=None):
+        if index:
+            row = index.row()
+        else:
+            select = self.table.get_selection()[0]
+            row = select.row()
+
         instance = self.table.get_row_instance(row)
 
         uuid = f'{self.model.__name__}_update'

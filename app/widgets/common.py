@@ -61,6 +61,9 @@ class QProgressButton(QButton):
 
     progress = Property(float, getProgress, setProgressValue)  # noqa
 
+    def resetProgress(self):
+        self.setProgress(1)
+
     def setProgress(self, value):
         value = max(0.0, min(1.0, value))
 

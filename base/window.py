@@ -3,15 +3,15 @@ from pathlib import Path
 from PySide6.QtGui import QIcon
 from qframelesswindow import FramelessWindow, StandardTitleBar
 
-import settings
-from app.core.settings import QSettings
+from app import settings as app_settings
+from app.core.settings import settings
 from app.mixin.loadui import LoadUiMixin
 from app.mixin.property_update import PropertyMixin
 
 
 class BaseWindow(PropertyMixin, LoadUiMixin, FramelessWindow):
     style_sheets = 'assets/qss/*.qss'
-    icon_path = settings.ICON_PATH
+    icon_path = app_settings.ICON_PATH
     title = 'Contabilidad'
 
     def __init__(self, *args, **kwargs):
@@ -23,7 +23,7 @@ class BaseWindow(PropertyMixin, LoadUiMixin, FramelessWindow):
         self.setWindowTitle(self.title.capitalize())
 
         self.load_qss()
-        self.app_settings = QSettings()
+        self._settings = settings
 
     def load_qss(self):
         self.setStyleSheet('')
@@ -36,7 +36,7 @@ class BaseWindow(PropertyMixin, LoadUiMixin, FramelessWindow):
                 file = Path(style_sheet_path)
                 self.add_style_sheet(file.read_text())
 
-        if settings.SHOW_BORDER:
+        if app_settings.SHOW_BORDER:
             self.add_style_sheet('* { border: 1px solid red; }')
 
     def add_style_sheet(self, style_sheet):
@@ -44,5 +44,5 @@ class BaseWindow(PropertyMixin, LoadUiMixin, FramelessWindow):
         self.setStyleSheet(f'{current_style_sheet}\n{style_sheet}')
 
     def closeEvent(self, event):
-        self.app_settings.get_widget_values()
+        self._settings.set_widget_values()
         super().closeEvent(event)

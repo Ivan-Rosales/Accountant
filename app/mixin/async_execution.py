@@ -1,5 +1,6 @@
 from PySide6.QtCore import QThread
 
+from base.popup import QDialogException
 from logger import logger
 
 
@@ -8,18 +9,26 @@ class AsyncExecutionMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.worker_class: return
 
-        if self.worker_class:
-            self.thread = QThread()
-            self.worker = self.worker_class()
-            self.worker.moveToThread(self.thread)
-            self.worker.start.connect(self.worker.on_start)
+        if not isinstance(self.worker_class, list):
+            self.worker_class = [self.worker_class]
 
-            if hasattr(self, 'on_success'): self.worker.success.connect(self.on_success)
-            if hasattr(self, 'on_progress'): self.worker.progress.connect(self.on_progress)
-            if hasattr(self, 'on_error'): self.worker.error.connect(self.on_error)
+        for i, worker_class in enumerate(self.worker_class):
+            self.register_worker(f'{i}', worker_class)
 
-            self.thread.start()
+    def register_worker(self, key, worker_class):
+        key = '' if key == '0' else f'_{key}'
+        setattr(self, f'thread{key}', QThread())
+        setattr(self, f'worker{key}', worker_class())
+        getattr(self, f'worker{key}').moveToThread(getattr(self, f'thread{key}'))
+        getattr(self, f'worker{key}').start.connect(getattr(self, f'worker{key}').on_start)
+
+        if hasattr(self, f'on_success{key}'): getattr(self, f'worker{key}').success.connect(getattr(self, f'on_success{key}'))
+        if hasattr(self, f'on_progress{key}'): getattr(self, f'worker{key}').progress.connect(getattr(self, f'on_progress{key}'))
+        if hasattr(self, f'on_error{key}'): getattr(self, f'worker{key}').error.connect(getattr(self, f'on_error{key}'))
+
+        getattr(self, f'thread{key}').start()
 
     def validate_data(self):
         return True
@@ -36,3 +45,18 @@ class AsyncExecutionMixin:
             self.worker.start.emit(*data)
         else:
             self.worker.start.emit(data)
+
+        self.execute_btn.setEnabled(False)
+
+    def on_success(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def on_progress(self, progress):
+        logger.info(f'{self.__class__.__name__}, progress: {progress}')
+        self.execute_btn.setProgress(progress)
+
+    def on_error(self, error):
+        self.execute_btn.setEnabled(True)
+        self.execute_btn.resetProgress()
+
+        raise QDialogException(self, str(error), format=False)

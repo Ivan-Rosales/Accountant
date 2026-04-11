@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QComboBox
 
-from app.core.settings import QSettings
+from app.core.settings import settings
 from app.mixin.model import ModelMixin
 from base.widget import BaseWidget
 
@@ -22,8 +22,7 @@ class QSelectorModel(ModelMixin, BaseWidget):
         getter = lambda: getattr(self.get_current(), 'id', None)
         setting_key = f'{parent_name}.selector_{self.model.__name__}'.lower()
 
-        app_settings = QSettings()
-        app_settings.register_setting(setting_key, getter, self.set_lazy_current, 0)
+        settings.register_setting(setting_key, getter, self.set_lazy_current, 0)
 
     def on_change(self, func):
         def wrapper(index):

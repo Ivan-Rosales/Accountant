@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
-import settings
-from app.core.settings import QSettings
+from app import settings as app_settings
+from app.core.settings import settings
 from app.views.client_admin import QClientAdmin
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
@@ -31,16 +31,14 @@ class MainWindow(BaseWindow):
         super().__init__(*args, **kwargs)
 
         default_tab = get_icon('report-3')
-
-        app_settings = QSettings()
-        app_settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
+        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
 
     def create_ui(self):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
 
         self.header_layout = QVBoxLayout()
 
-        if settings.DEBUG:
+        if app_settings.DEBUG:
             self.debug_tools = QDebugTools(self)
             self.header_layout.addWidget(self.debug_tools)
 
