@@ -14,7 +14,7 @@ APPDATA_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.Ap
 DOCUMENTS_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
 
 DEFAULT_WORK_DIR = f'{DOCUMENTS_DIR}/concentrados'
-DATABASE_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/db.sqlite3'
+DEFAULT_DATABASE_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/db.sqlite3'
 
 QSS_PATH = 'assets/base.qss'
 ICON_PATH = 'assets/icon.png'

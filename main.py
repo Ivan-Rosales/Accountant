@@ -1,8 +1,11 @@
+import os
+
 from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
 from app import settings as app_settings
-from app.core.settings import settings
+from app.core.settings import settings, WORKDIR
 from app.views.client_admin import QClientAdmin
+from app.views.configuration import QConfiguration
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
 from app.widgets.common import spacer, QButton
@@ -20,9 +23,10 @@ class MainWindow(BaseWindow):
     spacing = 0
 
     tabs = {
-        'report-3': QMonthSummary,
-        'report': QYearSummary,
+        'text-file': QMonthSummary,
+        'bar-char': QYearSummary,
         'user': QClientAdmin,
+        'gear': QConfiguration,
     }
 
     def __init__(self, *args, **kwargs):
@@ -36,14 +40,18 @@ class MainWindow(BaseWindow):
     def create_ui(self):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
 
-        self.header_layout = QVBoxLayout()
+        self.header_layout = QGridLayout()
+        self.header_layout.setColumnStretch(0, 1)
 
         if app_settings.DEBUG:
             self.debug_tools = QDebugTools(self)
-            self.header_layout.addWidget(self.debug_tools)
+            self.header_layout.addWidget(self.debug_tools, 0, 0, 1, 2)
 
-        self.header_layout.addWidget(self.client_selector)
+        self.header_layout.addWidget(self.client_selector, 1, 0)
+        self.header_layout.addWidget(QButton(get_icon('folder'), self, fn=self.open_path), 1, 1)
+
         self.header_layout.setContentsMargins(5, 5, 5, 5)
+
         self.header = QWidget()
         self.header.setObjectName("MainHeader")
         self.header.setLayout(self.header_layout)
@@ -96,3 +104,11 @@ class MainWindow(BaseWindow):
         if to_active_btn and to_show_widget:
             self.setPropertyUpddate(to_active_btn, 'state', 'active')
             to_show_widget.show()
+
+    def open_path(self):
+        client = self.client_selector.get_current()
+        if client is None: return
+        path = WORKDIR / client.rfc
+        path.mkdir(parents=True, exist_ok=True)
+        if path.is_dir():
+            os.startfile(path)

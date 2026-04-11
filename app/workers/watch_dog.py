@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 from PySide6.QtCore import Signal, QObject
 from watchdog.events import FileSystemEventHandler
@@ -36,6 +37,7 @@ class WatchdogWorkerBase(QObject):
     def on_start(self):
         handler = WatchdogHandler(self)
 
+        if isinstance(self.path, Path): self.path.mkdir(parents=True, exist_ok=True)
         self.observer.schedule(handler, self.path, recursive=True)
         self.observer.start()
 

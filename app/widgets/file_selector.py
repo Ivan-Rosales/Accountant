@@ -6,7 +6,9 @@ from base.popup import QDialogException
 from base.widget import BaseWidget
 
 
-class QFileSelector(BaseWidget):
+class QFilesSelector(BaseWidget):
+    dialog_type = QFileDialog.getOpenFileNames
+
     def __init__(self, *args, **kwargs):
         self.filter = kwargs.pop('filter', None)
         super().__init__(*args, **kwargs)
@@ -30,8 +32,11 @@ class QFileSelector(BaseWidget):
 
         return [Path(i) for i in self.files]
 
-    def on_click(self, _):
-        file_paths, _ = QFileDialog.getOpenFileNames(filter=self.filter)
+    def setPlaceholderText(self, *args, **kwargs):
+        self.input.setPlaceholderText(*args, **kwargs)
+
+    def on_click_files(self):
+        file_paths, _ = self.dialog_type(filter=self.filter)
         n_files = len(file_paths)
 
         if n_files == 0:
@@ -45,3 +50,34 @@ class QFileSelector(BaseWidget):
             self.input.setToolTip('\n'.join(file_paths))
 
         self.files = file_paths
+
+    def on_click_path(self):
+        self.path = self.dialog_type()
+        self.input.setText(self.path)
+        return self.path
+
+    def on_click(self, _):
+        if self.dialog_type in (QFileDialog.getOpenFileNames,):
+            self.on_click_files()
+
+        if self.dialog_type in (QFileDialog.getExistingDirectory,):
+            self.on_click_path()
+
+
+class QDirSelector(QFilesSelector):
+    dialog_type = QFileDialog.getExistingDirectory
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.path = None
+
+    def get_path(self) -> Path:
+        return self.path
+
+    def setPath(self, path):
+        self.input.setText(path)
+        self.path = path
+
+    def clear(self):
+        self.input.clear()
+        self.path = None

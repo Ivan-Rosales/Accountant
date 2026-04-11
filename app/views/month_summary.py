@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QVBoxLayout, QCheckBox
 from app.mixin.async_execution import AsyncExecutionMixin
 from app.widgets.common import spacer, QProgressButton
 from app.widgets.confirm_box import QConfirmMessageBox
-from app.widgets.file_selector import QFileSelector
+from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
 from app.workers.month_summary_worker import MonthSummaryWorker
 from base.widget import BaseWidget
@@ -16,7 +16,7 @@ class QMonthSummary(AsyncExecutionMixin, BaseWidget):
     worker_class = MonthSummaryWorker
 
     def create_ui(self):
-        self.selector = QFileSelector(self, filter="*.zip")
+        self.selector = QFilesSelector(self, filter="*.zip")
         self.prov_check = QCheckBox('Proveedores', self)
 
         self.metrics = QMetrics(self)

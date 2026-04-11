@@ -5,8 +5,8 @@ from PySide6.QtCore import QObject, Signal
 from sqlalchemy import create_engine, select, inspect, update
 from sqlalchemy.orm import sessionmaker
 
+from app.core.settings import DATABASE_DIR
 from logger import logger
-from app.settings import DATABASE_DIR
 
 Path(DATABASE_DIR).parent.mkdir(parents=True, exist_ok=True)
 engine = create_engine(f"sqlite:///{DATABASE_DIR}", echo=False)
