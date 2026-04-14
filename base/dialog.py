@@ -3,12 +3,12 @@ from datetime import datetime
 from qframelesswindow import FramelessDialog
 
 from app.mixin.loadui import LoadUiMixin
-from app.mixin.window import WindowMixin
+from app.mixin.title_bar import TitleBarMixin
 
 open_dialogs = {}
 
 
-class BaseDialog(WindowMixin, LoadUiMixin, FramelessDialog):
+class BaseDialog(TitleBarMixin, LoadUiMixin, FramelessDialog):
     margin = (10, 42, 10, 10)
 
     def __init__(self, *args, **kwargs):

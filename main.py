@@ -3,7 +3,7 @@ import os
 from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 
 from app import settings as app_settings
-from app.core.settings import settings, WORKDIR
+from app.core.settings import settings
 from app.views.client_admin import QClientAdmin
 from app.views.configuration import QConfiguration
 from app.views.month_summary import QMonthSummary
@@ -11,6 +11,7 @@ from app.views.year_summary import QYearSummary
 from app.widgets.common import spacer, QButton
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
+from app.workers.database import database_worker
 from base.window import BaseWindow
 from functions import get_icon
 from models import Cliente
@@ -18,7 +19,7 @@ from models import Cliente
 
 class MainWindow(BaseWindow):
     layout_class = QGridLayout
-    windows_size = (800, 400)
+    windows_size = (801, 401)
     margin = (0, 32, 0, 0)
     spacing = 0
 
@@ -29,13 +30,14 @@ class MainWindow(BaseWindow):
         'gear': QConfiguration,
     }
 
+    _load_qs = False
+
     def __init__(self, *args, **kwargs):
         self._tabs = {}
         self.active_tab = None
         super().__init__(*args, **kwargs)
 
-        default_tab = get_icon('report-3')
-        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, default_tab)
+        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'gear')
 
     def create_ui(self):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
@@ -74,16 +76,26 @@ class MainWindow(BaseWindow):
         layout.addWidget(self.buttons, 1, 0)
 
         for name, widget in self.tabs.items():
-            self.add_tab(get_icon(name), widget(self))
+            self.add_tab(name, widget(self))
 
         self.buttons_layout.addItem(spacer)
 
-    def add_tab(self, desc, widget):
-        btn = QButton(desc, self, fn=lambda _, key=desc: self.change_current_tab(key))
+        conf = self.get_widget_tab('gear')
+        conf.register_change('dbdir', database_worker.reset)
+        conf.register_change('theme', self.load_qss)
+        self.load_qss(conf.get_conf_value('theme'))
+
+    def get_widget_tab(self, name):
+        _, widget = self._tabs[name]
+        return widget
+
+    def add_tab(self, name, widget):
+        icon = get_icon(name)
+        btn = QButton(icon, self, fn=lambda _, key=name: self.change_current_tab(key))
         btn.setProperty('class', 'secondary')
 
         self.buttons_layout.addWidget(btn)
-        self._tabs[desc] = (btn, widget)
+        self._tabs[name] = (btn, widget)
 
         self._layout.addWidget(widget, 1, 1)
         widget.hide()
@@ -108,7 +120,7 @@ class MainWindow(BaseWindow):
     def open_path(self):
         client = self.client_selector.get_current()
         if client is None: return
-        path = WORKDIR / client.rfc
+        path = settings.get_workdir() / client.rfc
         path.mkdir(parents=True, exist_ok=True)
         if path.is_dir():
             os.startfile(path)

@@ -1,91 +1,114 @@
-from pathlib import Path
+from functools import cached_property
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout, QLabel
 
-from app.core.settings import DATABASE_DIR, WORKDIR, settings
+from app.core.settings import settings
+from app.widgets.color_picker import QThemePicker
 from app.widgets.common import spacer, QButton
 from app.widgets.file_selector import QDirSelector
 from base.widget import BaseWidget
+from functions import get_icon
 from logger import logger
 
 
 class QConfiguration(BaseWidget):
+    change_configuration = Signal(str, object)
     layout_class = QVBoxLayout
     margin = (5, 5, 5, 5)
+    last = None
 
-    fields = [
-        {
-            'field': 'workdir', 'label': 'Ruta de trabajo',
-            'component': QDirSelector, 'default': str(WORKDIR)
+    fields = {
+        'theme': {
+            'label': 'tema',
+            'widget': QThemePicker,
         },
-        {
-            'field': 'database_dir', 'label': 'Ruta de base de datos',
-            'component': QDirSelector, 'default': str(DATABASE_DIR)
+        'workdir': {
+            'label': 'ruta de trabajo',
+            'widget': QDirSelector,
         },
-    ]
+        'dbdir': {
+            'label': 'ruta de base de datos',
+            'widget': QDirSelector,
+        }
+    }
+
+    @cached_property
+    def widgets(self):
+        return {label: desc['widget'] for label, desc in self.fields.items() if desc.get('widget')}
 
     def create_ui(self):
-        self._widgets = {}
-        for definition in self.fields:
-            field = definition.get('field')
-            label = definition.get('label', field)
-            component_class = definition.get('component')
-            default = definition.get('default')
+        for label, description in self.fields.items():
+            widget_class = description.get('widget')
+            widget = widget_class(self) if widget_class else None
+            self.set_on_change(label, widget)
 
-            label = QLabel(label, self)
-            component = component_class(self)
+            self.fields[label]['widget'] = widget
+            settings.register_setting(
+                label,
+                lambda w=widget: self.get_value(w),
+                lambda value, w=widget: self.set_value(w, value),
+            )
 
-            if hasattr(component_class, 'setPath'):
-                component.setPath(default)
-
-            if hasattr(component_class, 'setPlaceholderText'):
-                component.setPlaceholderText(str(label))
-
-            self._widgets[f'{field}_label'] = label
-            self._widgets[field] = component
-
-        self.save_btn = QButton('guardar', self, fn=self.on_save)
-        self.save_btn.setProperty('class', 'primary')
+        self.widgets['dbdir'].with_file('db.sqlite3')
+        self.reset_btn = QButton(get_icon('recurring'), self, fn=self.reset_configuration, icon_opacity=0.5)
+        self.reset_btn.setText('Restablecer configuración'.capitalize())
 
     def load_ui(self, layout):
-        layout.addItem(spacer)
-        for widget in self._widgets.values():
+        for label, description in self.fields.items():
+            field_label = description.get('label', label)
+            layout.addWidget(QLabel(field_label.capitalize(), self))
+
+            widget = description['widget']
             layout.addWidget(widget)
         layout.addItem(spacer)
 
-        layout.addWidget(self.save_btn)
+        layout.addWidget(self.reset_btn)
+
+    def register_change(self, register, function):
+        def wrapper(label, *args, **kwargs):
+            if register == label: return function(*args, **kwargs)
+            return None
+
+        self.change_configuration.connect(wrapper)
+
+    def on_change(self, label, value):
+        if self.last == (label, value): return
+        settings.setValue(label, value)
+        self.change_configuration.emit(label, value)
+        self.last = (label, value)
+
+    def get_conf_value(self, label):
+        return self.get_value(self.widgets[label])
 
     def get_value(self, widget):
         if isinstance(widget, QDirSelector):
-            return Path(widget.get_path())
+            return str(widget.get_path())
+        elif isinstance(widget, QThemePicker):
+            return widget.get_value()
 
+        logger.warning(f'{self.__class__.__name__} is not defined get_value for {widget.__class__.__name__}')
         return None
 
-    def on_save(self):
-        widgets = {label: widget for label, widget in self._widgets.items() if not isinstance(widget, QLabel)}
-        values = {label: self.get_value(widget) for label, widget in widgets.items()}
+    def set_value(self, widget, value):
+        if isinstance(widget, QDirSelector):
+            widget.setPlaceholderText(value)
+            widget.setPath(value)
+        elif isinstance(widget, QThemePicker):
+            widget.set_value(value)
+        else:
+            logger.warning(f'{self.__class__.__name__} is not defined set_value for {widget.__class__.__name__}')
 
-        for key, value in values.items():
-            settings.setValue(key, str(value))
-            logger.info(f'{key.capitalize()} {value} saved')
+    def set_on_change(self, label, widget):
+        if isinstance(widget, QDirSelector):
+            widget.changeDir.connect(lambda *args, l=label, **kwargs: self.on_change(l, self.get_value(widget)))
+        elif isinstance(widget, QThemePicker):
+            widget.changeTheme.connect(lambda *args, l=label, **kwargs: self.on_change(l, self.get_value(widget)))
+        else:
+            logger.warning(f'{self.__class__.__name__} is not defined set_on_change for {widget.__class__.__name__}')
 
-
-"""
-    def validate_dbdir(self):
-        print('validate_dbdir')
-        raw_path = self.dbdir_edit.get_path()
-        if raw_path is None: return
-        path = str(raw_path)
-        if not path.endswith(f'db.sqlite3'):
-            path += '/db.sqlite3'
-            self.dbdir_edit.setPath(path)
-
-    def save(self):
-        path = str(self.dbdir_edit.get_path())
-        settings.setValue('database_dir', str(Path(path)))
-        logger.info(f'Database directory {path} saved')
-
-        path = self.workdir_edit.get_path()
-        settings.setValue('workdir', str(Path(path)))
-        logger.info(f'Working directory {path} saved')
-"""
+    def reset_configuration(self):
+        for label, description in self.fields.items():
+            widget = description.get('widget')
+            default_value = description.get('default')
+            self.set_value(widget, default_value)

@@ -5,7 +5,7 @@ from functools import cached_property
 
 from PySide6.QtWidgets import QGridLayout, QComboBox, QWidget
 
-from app.core.settings import settings, WORKDIR
+from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
 from app.mixin.property_update import PropertyMixin
 from app.widgets.common import QButton, spacer, QProgressButton
@@ -22,7 +22,7 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
     margin = (5, 5, 5, 5)
     spacing = 4
 
-    worker_class = [YearSummaryWorker, WatchdogWorker(WORKDIR)]
+    worker_class = [YearSummaryWorker, WatchdogWorker(settings.get_workdir())]
 
     @cached_property
     def client_selector(self):

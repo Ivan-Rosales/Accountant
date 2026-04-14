@@ -12,6 +12,12 @@ class QSettings(QBaseSettings):
 
     widgets: dict = {}
 
+    defaults = {
+        'theme': base_settings.DEFAULT_THEME,
+        'workdir': base_settings.DEFAULT_WORK_DIR,
+        'dbdir': base_settings.DEFAULT_DATABASE_DIR,
+    }
+
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(QBaseSettings, cls).__new__(cls)
@@ -26,9 +32,13 @@ class QSettings(QBaseSettings):
 
         logger.info(f'Configuration file {self.fileName()}')
 
+    def value(self, key, default=None):
+        default = default or self.defaults.get(key)
+        return super().value(key, default)
+
     def register_setting(self, key, getter, setter, default=None):
         self.widgets[key] = (getter, setter)
-        value = self.value(key) or default
+        value = self.value(key, default)
         if value: setter(value)
 
     def set_widget_values(self):
@@ -36,13 +46,7 @@ class QSettings(QBaseSettings):
             self.setValue(key, getter())
 
     def get_workdir(self):
-        return Path(str(self.value('workdir', base_settings.DEFAULT_WORK_DIR)))
-
-    def get_database_dir(self):
-        return Path(str(self.value('database_dir', base_settings.DEFAULT_DATABASE_DIR)))
+        return Path(str(self.value('workdir')))
 
 
 settings = QSettings()
-
-WORKDIR = settings.get_workdir()
-DATABASE_DIR = settings.get_database_dir()

@@ -1,17 +1,13 @@
-from functools import cached_property
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 from sqlalchemy import create_engine, select, inspect, update
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from app.core.settings import DATABASE_DIR
+from app.core.settings import settings
+from app.settings import DEFAULT_DATABASE_DIR
 from logger import logger
-
-Path(DATABASE_DIR).parent.mkdir(parents=True, exist_ok=True)
-engine = create_engine(f"sqlite:///{DATABASE_DIR}", echo=False)
-SessionLocal = sessionmaker(bind=engine)
-logger.info(f'Database {DATABASE_DIR}')
 
 
 def wrapper_model(register_model, func):
@@ -55,16 +51,39 @@ class ModelMixin:
 
 class DatabaseWorker(QObject):
     execute = Signal(object)
+    base = declarative_base()
 
     on_change = Signal(object, list)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.execute.connect(self.on_execute)
+        self._session = None
 
-    @cached_property
+    def reset(self, *_, **__):
+        self._session = None
+
+        models = self.base.registry.mappers
+        for mapper in models:
+            model = mapper.class_
+            model.all()
+
+    @property
     def session(self):
-        return SessionLocal()
+        if self._session is None:
+            database_dir = settings.value('dbdir')
+            if database_dir is None:
+                logger.error('database path is not set')
+                return None
+
+            Path(database_dir).parent.mkdir(parents=True, exist_ok=True)
+            engine = create_engine(f"sqlite:///{database_dir}", echo=False)
+            logger.info(f'Database {database_dir}')
+            self.base.metadata.create_all(engine)
+
+            self._session = sessionmaker(bind=engine)()
+
+        return self._session
 
     def on_execute(self, func):
         if callable(func): func()

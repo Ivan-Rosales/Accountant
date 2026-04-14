@@ -15,9 +15,10 @@ DOCUMENTS_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.
 
 DEFAULT_WORK_DIR = f'{DOCUMENTS_DIR}/concentrados'
 DEFAULT_DATABASE_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/db.sqlite3'
+DEFAULT_THEME = 'verde'
 
 QSS_PATH = 'assets/base.qss'
-ICON_PATH = 'assets/icon.png'
+ICON_PATH = 'assets/icon.svg'
 
 if not os.path.exists(ICON_PATH):
     logger.warn('the base icon file does not exist')

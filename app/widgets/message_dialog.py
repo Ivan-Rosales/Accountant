@@ -1,18 +1,11 @@
 from PySide6.QtWidgets import QMessageBox, QStyle, QLabel, QGridLayout, QHBoxLayout, QPushButton, QTextEdit
-from qframelesswindow import FramelessDialog
 
-from app.mixin.loadui import LoadUiMixin
-from app.mixin.window import WindowMixin
 from app.widgets.common import spacer
+from base.dialog import BaseDialog
 from logger import logger
 
 
-class Buttons:
-    success = 'ok'
-    details = 'mostrar detalles'
-
-
-class QMessageDialog(WindowMixin, LoadUiMixin, FramelessDialog):
+class QMessageDialog(BaseDialog):
     layout_class = QGridLayout
     icon_map = {
         QMessageBox.Icon.Warning: QStyle.StandardPixmap.SP_MessageBoxWarning,
@@ -21,6 +14,7 @@ class QMessageDialog(WindowMixin, LoadUiMixin, FramelessDialog):
 
     windows_size = (600, 100)
     _clickedButton = None
+    details = 'mostrar detalles'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -50,7 +44,7 @@ class QMessageDialog(WindowMixin, LoadUiMixin, FramelessDialog):
         self.buttons = QHBoxLayout()
         self.buttons.addItem(spacer)
 
-        diff = [i for i in self.default_buttons if i != Buttons.details]
+        diff = [i for i in self.default_buttons if i != self.details]
         if len(diff) == 0: self.insertButton('ok')
 
         for label in self.default_buttons:
@@ -79,8 +73,8 @@ class QMessageDialog(WindowMixin, LoadUiMixin, FramelessDialog):
         self.text.show()
 
     def setDetailedText(self, text):
-        if Buttons.details not in self.default_buttons:
-            self.addButton(Buttons.details, None)
+        if self.details not in self.default_buttons:
+            self.addButton(self.details, None)
         self.detailed_text.setText(text)
 
     def addButton(self, text, _=None):
@@ -95,12 +89,12 @@ class QMessageDialog(WindowMixin, LoadUiMixin, FramelessDialog):
         pass
 
     def on_click(self, name):
-        if name == Buttons.details:
+        if name == self.details:
             is_visible = not self.detailed_text.isVisible()
             self.detailed_text.setVisible(is_visible)
             self.adjustSize()
 
-            message = 'ocultar detalles'.capitalize() if is_visible else Buttons.details.capitalize()
+            message = 'ocultar detalles'.capitalize() if is_visible else self.details.capitalize()
             self.btn_mostrar_detalles.setText(message)
             return
 

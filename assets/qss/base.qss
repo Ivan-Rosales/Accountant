@@ -1,7 +1,7 @@
 * {
     background-color: #212529;
     selection-color: #ffffff;
-    selection-background-color: #0d6efd;
+    selection-background-color: {{color}};
 }
 
 *[class~="secondary"] {
@@ -28,7 +28,7 @@
 }
 
 #MainButtons > QPushButton[state~="active"] {
-    border-left: 5px solid #0d6efd;
+    border-left: 5px solid {{color}};
 }
 
 #TableControllers > QLabel {
