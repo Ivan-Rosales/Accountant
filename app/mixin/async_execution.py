@@ -24,9 +24,14 @@ class AsyncExecutionMixin:
         getattr(self, f'worker{key}').moveToThread(getattr(self, f'thread{key}'))
         getattr(self, f'worker{key}').start.connect(getattr(self, f'worker{key}').on_start)
 
-        if hasattr(self, f'on_success{key}'): getattr(self, f'worker{key}').success.connect(getattr(self, f'on_success{key}'))
-        if hasattr(self, f'on_progress{key}'): getattr(self, f'worker{key}').progress.connect(getattr(self, f'on_progress{key}'))
-        if hasattr(self, f'on_error{key}'): getattr(self, f'worker{key}').error.connect(getattr(self, f'on_error{key}'))
+        attr = f'on_success{key}'
+        if hasattr(self, attr): getattr(self, f'worker{key}').success.connect(getattr(self, attr))
+
+        attr = f'on_progress{key}'
+        if hasattr(self, attr): getattr(self, f'worker{key}').progress.connect(getattr(self, attr))
+
+        attr = f'on_error{key}'
+        if hasattr(self, attr): getattr(self, f'worker{key}').error.connect(getattr(self, attr))
 
         getattr(self, f'thread{key}').start()
 
@@ -59,4 +64,4 @@ class AsyncExecutionMixin:
         self.execute_btn.setEnabled(True)
         self.execute_btn.resetProgress()
 
-        raise QDialogException(self, str(error), format=False)
+        raise QDialogException(self, str(error), format=False) from error

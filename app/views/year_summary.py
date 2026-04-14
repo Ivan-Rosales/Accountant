@@ -114,7 +114,8 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
 
                 for month in range(1, 13):
                     button: QButton | QWidget = self.buttons.itemAtPosition(row, month).widget()
-                    button.setProperty('file', file)
+                    button.setProperty('summary', summary)
+                    button.setProperty('month', month)
                     self.set_default(button)
 
                     sheet_name = month_name[month].capitalize()
@@ -132,8 +133,12 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
         button.setEnabled(True)
 
     def btn_click(self, button):
-        file = button.property('file')
-        if file.exists(): os.startfile(str(file))
+        summary = button.property('summary')
+        month = button.property('month')
+        sheet_name = month_name[month].capitalize()
+        summary.set_active_sheet(sheet_name)
+
+        summary.startfile()
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()

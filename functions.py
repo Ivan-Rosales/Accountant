@@ -1,6 +1,11 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 
+def to_bool(string_bool):
+    string_bool = string_bool.strip().lower()
+    return string_bool in ("true", "1", "yes", "y", "on")
+
+
 def get_icon(icon):
     return f'assets/icons/{icon}.png'
 

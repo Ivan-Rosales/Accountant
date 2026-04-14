@@ -32,9 +32,6 @@ class MonthSummary(FileExecution):
 
         self.xml_files: Dict[str:XmlFile] = {}
 
-        self.has_ieps = False
-        self.has_ret_isr = False
-        self.has_ret_iva = False
         self.header_set = False
         self.columns_set = False
         self.footer_set = False
@@ -74,7 +71,30 @@ class MonthSummary(FileExecution):
     @cached_property
     def sheet(self):
         sheet_name = month_name[self.month].capitalize()
-        return self.workbook.create_sheet(sheet_name)
+        sheet = self.get_sheet(sheet_name)
+
+        if sheet:
+            self.workbook.remove(sheet)
+            sheet = self.workbook.create_sheet(sheet_name)
+
+        sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
+        return sheet
+
+    @cached_property
+    def has_ieps(self):
+        return any(i.ieps > 0 for i in self.xml_files.values())
+
+    @cached_property
+    def has_ret_isr(self):
+        return any(i.ret_isr > 0 for i in self.xml_files.values())
+
+    @cached_property
+    def has_ret_iva(self):
+        return any(i.ret_iva > 0 for i in self.xml_files.values())
+
+    @cached_property
+    def has_ret(self):
+        return self.has_ret_isr or self.has_ret_iva
 
     def validate(self):
         if not isinstance(self.client, Cliente):
@@ -119,10 +139,6 @@ class MonthSummary(FileExecution):
         self.header_set = True
 
     def set_columns(self):
-        self.has_ieps = any(i.ieps > 0 for i in self.xml_files.values())
-        self.has_ret_isr = any(i.ret_isr > 0 for i in self.xml_files.values())
-        self.has_ret_iva = any(i.ret_iva > 0 for i in self.xml_files.values())
-
         columns = ['subtotal', 'iva', 'total']
 
         if self.has_ieps:
@@ -143,6 +159,8 @@ class MonthSummary(FileExecution):
         if xml.uuid not in self.xml_files:
             self.xml_files[xml.uuid] = xml
 
+        if xml.tipo == 'N': return
+
         kind = self.rev
         row = max([6, self.sheet.max_row + 1])
 
@@ -155,6 +173,8 @@ class MonthSummary(FileExecution):
         total = xml.total
         ieps = xml.ieps
         iva = xml.iva
+
+        total_prev = None
 
         # delete insignificant values
         if self.has_ieps and 1.16 < total:
@@ -174,6 +194,18 @@ class MonthSummary(FileExecution):
             ieps = ieps * Decimal(-1)
             iva = iva * Decimal(-1)
 
+        if self.has_ret:
+            total_prev = total + xml.ret_iva + xml.ret_isr
+            subtotal = total_prev - iva
+
+            if self.has_ieps:
+                if 0 < iva and 0 <= (xml.iva * Decimal(6.25) - gravado - ieps) < 1:
+                    subtotal = Decimal(0)
+
+                if 0.1 < abs(total_prev - ieps - iva - gravado - subtotal):
+                    gravado = total_prev - ieps - iva
+                    subtotal = Decimal(0)
+
         column = 4
         self.sheet.cell(row=row, column=column).value = subtotal
 
@@ -183,6 +215,13 @@ class MonthSummary(FileExecution):
             column += 2
 
         self.sheet.cell(row=row, column=column + 1).value = iva
+
+        if self.has_ret and total_prev:
+            self.sheet.cell(row=row, column=column + 2).value = total_prev
+            self.sheet.cell(row=row, column=column + 3).value = xml.ret_iva
+            self.sheet.cell(row=row, column=column + 4).value = xml.ret_isr
+            column += 3
+
         self.sheet.cell(row=row, column=column + 2).value = total
 
         logger.info(f'{self.__class__.__name__} added file {xml.uuid}')

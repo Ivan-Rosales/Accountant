@@ -4,6 +4,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout, QLabel
 
 from app.core.settings import settings
+from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR
 from app.widgets.color_picker import QThemePicker
 from app.widgets.common import spacer, QButton
 from app.widgets.file_selector import QDirSelector
@@ -22,14 +23,17 @@ class QConfiguration(BaseWidget):
         'theme': {
             'label': 'tema',
             'widget': QThemePicker,
+            'default': DEFAULT_THEME,
         },
         'workdir': {
             'label': 'ruta de trabajo',
             'widget': QDirSelector,
+            'default': DEFAULT_WORK_DIR,
         },
         'dbdir': {
             'label': 'ruta de base de datos',
             'widget': QDirSelector,
+            'default': DEFAULT_DATABASE_DIR,
         }
     }
 

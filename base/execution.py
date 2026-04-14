@@ -61,6 +61,16 @@ class FileExecution(BaseExecution):
     def get_sheet(self, sheet_name):
         return next((sheet for sheet in self.sheets if sheet.title == sheet_name), None)
 
+    def set_active_sheet(self, sheet_name):
+        sheet = self.get_sheet(sheet_name)
+        if sheet is None: return
+
+        for current_sheet in self.sheets:
+            current_sheet.sheet_view.tabSelected = False
+
+        self.workbook.active = self.workbook.index(sheet)
+        self.workbook.save(self.filename)
+
     def save(self):
         self.filename.parent.mkdir(parents=True, exist_ok=True)
         self.workbook._sheets = self.order_sheets(self.sheets)
@@ -69,4 +79,7 @@ class FileExecution(BaseExecution):
         logger.info(f'{self.__class__.__name__} saved in {self.filename}')
 
     def startfile(self):
-        os.startfile(self.filename)
+        if self.filename.exists():
+            os.startfile(self.filename)
+        else:
+            logger.warn(f'{self.__class__.__name__} filename does not exist')
