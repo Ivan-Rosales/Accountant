@@ -9,10 +9,19 @@ from base.widget import BaseWidget
 class QTableModel(ModelMixin, BaseWidget):
     start_signal = Signal()
 
+    flex = {
+        'id': 0.2,
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._rendered = False
+
     def create_ui(self):
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(self.fields))
-        self.table.setHorizontalHeaderLabels([(i.comment or i.name).capitalize() for i in self.fields])
+        self.headers_labels = [(i.comment or i.name).capitalize() for i in self.fields]
+        self.table.setHorizontalHeaderLabels(self.headers_labels)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -25,6 +34,25 @@ class QTableModel(ModelMixin, BaseWidget):
 
     def load_ui(self, layout):
         layout.addWidget(self.table)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._rendered: return
+        self._rendered = True
+
+        table_width = self.table.viewport().width()
+        flexs = [self.flex.get(col.lower(), 1) for col in self.headers_labels]
+        count_flex = sum(flexs)
+
+        width_per_unit = table_width // count_flex
+        widths = [int(width_per_unit * col) for col in flexs]
+
+        col = None
+        for col, width in enumerate(widths):
+            self.table.setColumnWidth(col, width)
+
+        last_col_width = widths[col] + int(table_width - (width_per_unit * count_flex))
+        self.table.setColumnWidth(col, last_col_width)
 
     def load_instances(self, instances):
         self.table.setRowCount(0)

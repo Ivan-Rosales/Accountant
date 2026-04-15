@@ -19,5 +19,6 @@ class QRowInstance:
             item = QTableWidgetItem(value)
             if col == 0:
                 item.setData(Qt.ItemDataRole.UserRole, instance)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             self.table.setItem(row, col, item)
