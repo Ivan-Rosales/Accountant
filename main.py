@@ -76,9 +76,10 @@ class MainWindow(BaseWindow):
         layout.addWidget(self.buttons, 1, 0)
 
         for name, widget in self.tabs.items():
-            self.add_tab(name, widget(self))
+            if name == 'gear':
+                self.buttons_layout.addItem(spacer)
 
-        self.buttons_layout.addItem(spacer)
+            self.add_tab(name, widget(self))
 
         conf = self.get_widget_tab('gear')
         conf.register_change('dbdir', database_worker.reset)
@@ -92,7 +93,6 @@ class MainWindow(BaseWindow):
     def add_tab(self, name, widget):
         icon = get_icon(name)
         btn = QButton(icon, self, fn=lambda _, key=name: self.change_current_tab(key))
-        btn.setProperty('class', 'secondary')
 
         self.buttons_layout.addWidget(btn)
         self._tabs[name] = (btn, widget)

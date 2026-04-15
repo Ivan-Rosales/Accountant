@@ -5,7 +5,7 @@
 }
 
 *[class~="secondary"] {
-    color: #51585e;
+    color: #6c757d;
 }
 
 #MainHeader {

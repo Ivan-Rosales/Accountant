@@ -55,8 +55,8 @@ class QConfiguration(BaseWidget):
             )
 
         self.widgets['dbdir'].with_file('db.sqlite3')
-        self.reset_btn = QButton(get_icon('recurring'), self, fn=self.reset_configuration, icon_opacity=0.5)
-        self.reset_btn.setText('Restablecer configuración'.capitalize())
+        self.reset_btn = QButton('restablecer configuración'.capitalize(), self, fn=self.reset_configuration)
+        self.reset_btn.setProperty('type', 'flat')
 
     def load_ui(self, layout):
         for label, description in self.fields.items():
