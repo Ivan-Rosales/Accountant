@@ -6,13 +6,13 @@ from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
 from app.workers.month_summary_worker import MonthSummaryWorker
-from base.widget import BaseWidget
+from base.tab import TabWidget
 from logger import logger
 
 
-class QMonthSummary(AsyncExecutionMixin, BaseWidget):
+class QMonthSummary(AsyncExecutionMixin, TabWidget):
     layout_class = QVBoxLayout
-    margin = (5, 5, 5, 5)
+    tooltip_label = 'concentrado mensual'
 
     worker_class = MonthSummaryWorker
 

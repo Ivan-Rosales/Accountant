@@ -12,15 +12,14 @@ from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.secondary_label import QSecondaryLabel
 from app.workers.watch_dog import WatchdogWorker
 from app.workers.year_summary_worker import YearSummaryWorker
-from base.widget import BaseWidget
+from base.tab import TabWidget
 from execution.month_summary import MonthSummary
 from logger import logger
 
 
-class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
+class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
     layout_class = QGridLayout
-    margin = (5, 5, 5, 5)
-    spacing = 4
+    tooltip_label = 'concentrado anual'
 
     worker_class = [YearSummaryWorker, WatchdogWorker(settings.get_workdir())]
 

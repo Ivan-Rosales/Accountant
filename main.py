@@ -50,7 +50,10 @@ class MainWindow(BaseWindow):
             self.header_layout.addWidget(self.debug_tools, 0, 0, 1, 2)
 
         self.header_layout.addWidget(self.client_selector, 1, 0)
-        self.header_layout.addWidget(QButton(get_icon('folder'), self, fn=self.open_path), 1, 1)
+
+        self.folder_btn = QButton(get_icon('folder'), self, fn=self.open_path)
+        self.folder_btn.setToolTip('abrir carpeta del cliente'.capitalize())
+        self.header_layout.addWidget(self.folder_btn, 1, 1)
 
         self.header_layout.setContentsMargins(5, 5, 5, 5)
 
@@ -93,6 +96,9 @@ class MainWindow(BaseWindow):
     def add_tab(self, name, widget):
         icon = get_icon(name)
         btn = QButton(icon, self, fn=lambda _, key=name: self.change_current_tab(key))
+
+        if tooltip_label := getattr(widget, 'tooltip_label', None):
+            btn.setToolTip(tooltip_label.capitalize())
 
         self.buttons_layout.addWidget(btn)
         self._tabs[name] = (btn, widget)

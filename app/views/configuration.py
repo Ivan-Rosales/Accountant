@@ -8,16 +8,17 @@ from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR
 from app.widgets.color_picker import QThemePicker
 from app.widgets.common import QButton, spacer
 from app.widgets.file_selector import QDirSelector
-from base.widget import BaseWidget
+from base.tab import TabWidget
 from functions import get_icon
 from logger import logger
 
 
-class QConfiguration(BaseWidget):
+class QConfiguration(TabWidget):
     change_configuration = Signal(str, object)
     layout_class = QGridLayout
-    margin = (5, 5, 5, 5)
     touched = {}
+
+    tooltip_label = 'configuración'
 
     fields = {
         'theme': {
@@ -59,6 +60,7 @@ class QConfiguration(BaseWidget):
         self.save_btn.setProperty('class', 'primary')
 
         self.reset_btn = QButton(get_icon('recurring'), self, fn=self.reset_configuration, icon_opacity=0.5)
+        self.reset_btn.setToolTip('regresar a la configuración por defecto'.capitalize())
         self.reset_btn.setProperty('type', 'flat')
 
     def load_ui(self, layout: QGridLayout):
