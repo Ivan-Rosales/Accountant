@@ -1,0 +1,11 @@
+QLabel[class~="invalid"] {
+    color: #b1192a;
+}
+
+QLineEdit[class~="invalid"] {
+    border-color: #b1192a;
+}
+
+QRadioButton[class~="invalid"]:checked {
+    border: 1px solid #b1192a;
+}

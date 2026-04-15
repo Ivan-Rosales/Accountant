@@ -3,11 +3,12 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QLineEdit, QFileDialog
 
+from app.mixin.property_update import PropertyMixin
 from base.popup import QDialogException
 from base.widget import BaseWidget
 
 
-class QFilesSelector(BaseWidget):
+class QFilesSelector(PropertyMixin, BaseWidget):
     dialog_type = QFileDialog.getOpenFileNames
     placeholderText = 'archivos...'
 
@@ -59,6 +60,9 @@ class QFilesSelector(BaseWidget):
             self.input.setToolTip('\n'.join(file_paths))
 
         self.files = file_paths
+
+    def setProperty(self, *args, **kwargs):
+        self.setPropertyUpddate(self.input, *args, **kwargs)
 
 
 class QDirSelector(QFilesSelector):

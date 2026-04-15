@@ -2,11 +2,12 @@ from functools import cached_property
 
 from PySide6.QtWidgets import QRadioButton, QButtonGroup
 
+from app.mixin.property_update import PropertyMixin
 from base.widget import BaseWidget
 from base.window import THEMES
 
 
-class QThemePicker(BaseWidget):
+class QThemePicker(PropertyMixin, BaseWidget):
     colors: list | dict = list(THEMES.keys())
 
     def create_ui(self):
@@ -38,3 +39,7 @@ class QThemePicker(BaseWidget):
         if not isinstance(self.colors, dict): return
         if radio := self.colors.get(theme):
             radio.setChecked(True)
+
+    def setProperty(self, *args, **kwargs):
+        for widget in self.colors.values():
+            self.setPropertyUpddate(widget, *args, **kwargs)
