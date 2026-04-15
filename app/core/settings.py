@@ -41,9 +41,14 @@ class QSettings(QBaseSettings):
         value = self.value(key, default)
         if value: setter(value)
 
+        logger.debug(f'Registered widget {key}')
+
     def set_widget_values(self):
         for key, (getter, setter) in self.widgets.items():
-            self.setValue(key, getter())
+            value = getter()
+            self.setValue(key, value)
+
+            logger.debug(f'Register saved widget {key} {value}')
 
     def get_workdir(self):
         return Path(str(self.value('workdir')))

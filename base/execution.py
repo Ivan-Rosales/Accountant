@@ -17,7 +17,7 @@ class BaseExecution:
         self.workdir = settings.get_workdir()
 
 
-class FileExecution(BaseExecution):
+class WorkbookExecution(BaseExecution):
     NUMBER_FORMAT = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@_-'
     DATE_FORMAT = 'dd/mm/yyyy'
 
@@ -30,8 +30,12 @@ class FileExecution(BaseExecution):
         if self.filename.exists():
             try:
                 workbook = load_workbook(self.filename)
+            except PermissionError:
+                raise ValidationException(f'Cierre el archivo antes de ejecutar\n{self.filename}')
             except BadZipFile:
                 raise ValidationException(f'Hay un problema con el archivo\n{self.filename}')
+
+            logger.debug(f'{self.__class__.__name__} workbook loaded from {self.filename}')
         else:
             workbook = Workbook()
             workbook.remove(workbook.active)
@@ -43,7 +47,7 @@ class FileExecution(BaseExecution):
         return getattr(self.workbook, '_sheets', [])
 
     @staticmethod
-    def order_sheets(sheets: list):
+    def get_order_sheets(sheets: list):
         order_sheets = []
         months = [m.capitalize() for m in list(month_name)[1:]]
 
@@ -69,14 +73,20 @@ class FileExecution(BaseExecution):
             current_sheet.sheet_view.tabSelected = False
 
         self.workbook.active = self.workbook.index(sheet)
-        self.workbook.save(self.filename)
+        self.save_file()
+
+    def order_sheets(self):
+        self.workbook._sheets = self.get_order_sheets(self.sheets)
 
     def save(self):
-        self.filename.parent.mkdir(parents=True, exist_ok=True)
-        self.workbook._sheets = self.order_sheets(self.sheets)
-        self.workbook.save(self.filename)
+        self.order_sheets()
+        self.save_file()
 
         logger.info(f'{self.__class__.__name__} saved in {self.filename}')
+
+    def save_file(self):
+        self.filename.parent.mkdir(parents=True, exist_ok=True)
+        self.workbook.save(self.filename)
 
     def startfile(self):
         if self.filename.exists():

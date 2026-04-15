@@ -6,7 +6,6 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from app.core.settings import settings
-from app.settings import DEFAULT_DATABASE_DIR
 from logger import logger
 
 
@@ -73,7 +72,7 @@ class DatabaseWorker(QObject):
         if self._session is None:
             database_dir = settings.value('dbdir')
             if database_dir is None:
-                logger.error('database path is not set')
+                logger.error('Database path is not defined')
                 return None
 
             Path(database_dir).parent.mkdir(parents=True, exist_ok=True)
@@ -89,16 +88,22 @@ class DatabaseWorker(QObject):
         if callable(func): func()
 
     def get_all(self, model):
+        logger.debug(f'Getting {model.__name__}')
+
         rows = self.session.query(model).all()
         self.on_change.emit(model, rows)
 
     def get_or_create(self, model, **kwargs):
+        logger.debug(f'Getting or creating {model.__name__} {kwargs}')
+
         instance = self.session.execute(select(model).filter_by(**kwargs)).scalar_one_or_none()
         create = instance is None
         if create: self.create(model, **kwargs)
         self.get_all(model)
 
     def create(self, model, **kwargs):
+        logger.debug(f'Creating {model.__name__} {kwargs}')
+
         instance = model(**kwargs)
         self.session.add(instance)
         self.session.commit()
@@ -106,6 +111,8 @@ class DatabaseWorker(QObject):
         self.get_all(model)
 
     def update(self, model, **kwargs):
+        logger.debug(f'Updating {model.__name__} {kwargs}')
+
         pk = kwargs.pop('id')
         instance = self.session.get(model, pk)
         for key, value in kwargs.items():
@@ -114,11 +121,15 @@ class DatabaseWorker(QObject):
         self.get_all(model)
 
     def delete(self, model, instance):
+        logger.debug(f'Deleting {model.__name__} {instance}')
+
         self.session.delete(instance)
         self.session.commit()
         self.get_all(model)
 
     def save(self, instance):
+        logger.debug(f'Saving {instance.__class__.__name__} {instance}')
+
         state = inspect(instance)
         fields = [attr.key for attr in state.attrs if attr.history.has_changes()]
 

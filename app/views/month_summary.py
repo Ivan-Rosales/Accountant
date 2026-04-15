@@ -7,6 +7,7 @@ from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
 from app.workers.month_summary_worker import MonthSummaryWorker
 from base.widget import BaseWidget
+from logger import logger
 
 
 class QMonthSummary(AsyncExecutionMixin, BaseWidget):
@@ -43,6 +44,8 @@ class QMonthSummary(AsyncExecutionMixin, BaseWidget):
         return get_paths, client, params
 
     def on_success(self, summary, n_files):
+        logger.debug(f'{self.__class__.__name__} generation success {summary} {n_files}')
+
         self.execute_btn.setEnabled(True)
         self.execute_btn.resetProgress()
         self.metrics.add_registers_today(n_files)

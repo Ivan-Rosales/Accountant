@@ -15,11 +15,14 @@ class LoadUiMixin:
         super().__init__(*args, **kwargs)
 
         self.create_ui()
+        logger.debug(f'{self.__class__.__name__} created UI')
 
         self._layout = self.layout_class(self)
         self._layout.setContentsMargins(*self.margin)
         self._layout.setSpacing(self.spacing)
+
         self.load_ui(self._layout)
+        logger.debug(f'{self.__class__.__name__} load UI')
 
         if self.windows_size is not None:
             self.resize(*self.windows_size)

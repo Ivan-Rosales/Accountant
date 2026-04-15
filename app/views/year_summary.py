@@ -1,4 +1,3 @@
-import os
 from calendar import month_abbr, month_name
 from datetime import datetime
 from functools import cached_property
@@ -15,6 +14,7 @@ from app.workers.watch_dog import WatchdogWorker
 from app.workers.year_summary_worker import YearSummaryWorker
 from base.widget import BaseWidget
 from execution.month_summary import MonthSummary
+from logger import logger
 
 
 class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
@@ -103,7 +103,10 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
 
     def load_data(self, client):
         if client is None: return
+
         current_year = self.years.currentText()
+        logger.debug(f'{self.__class__.__name__} loading data for client {client} and year {current_year}')
+
         files_path = self.workdir / client.rfc
         for row, kind in enumerate(('egresos', 'ingresos')):
             file = files_path / f'{client.rfc} {current_year} {kind.upper()}.xlsx'
@@ -120,8 +123,10 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
 
                     sheet_name = month_name[month].capitalize()
                     if summary.get_sheet(sheet_name):
+                        logger.debug(f'{self.__class__.__name__} has sheet {kind} {sheet_name}')
                         self.set_found(button)
-            except:
+            except Exception as error:
+                logger.error(f'{self.__class__.__name__} cannot load data {error}')
                 continue
 
     def set_default(self, button):
@@ -135,6 +140,9 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
     def btn_click(self, button):
         summary = button.property('summary')
         month = button.property('month')
+
+        logger.debug(f'{self.__class__.__name__} opening summary {summary} {month}')
+
         sheet_name = month_name[month].capitalize()
         summary.set_active_sheet(sheet_name)
 
@@ -147,6 +155,8 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, BaseWidget):
         return client, year, month
 
     def on_success(self, summary):
+        logger.debug(f'{self.__class__.__name__} generation success {summary}')
+
         self.execute_btn.setEnabled(True)
         self.execute_btn.resetProgress()
 

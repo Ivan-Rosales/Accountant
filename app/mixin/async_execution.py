@@ -35,6 +35,8 @@ class AsyncExecutionMixin:
 
         getattr(self, f'thread{key}').start()
 
+        logger.debug(f'Registered worker {key} {worker_class.__name__} in {self.__class__.__name__}')
+
     def validate_data(self):
         return True
 
@@ -57,10 +59,13 @@ class AsyncExecutionMixin:
         raise NotImplementedError
 
     def on_progress(self, progress):
-        logger.info(f'{self.__class__.__name__}, progress: {progress}')
+        logger.debug(f'{self.__class__.__name__}, progress: {progress}')
+
         self.execute_btn.setProgress(progress)
 
     def on_error(self, error):
+        logger.error(f'{self.__class__.__name__}, error: {error}')
+
         self.execute_btn.setEnabled(True)
         self.execute_btn.resetProgress()
 

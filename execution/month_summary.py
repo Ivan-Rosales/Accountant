@@ -5,12 +5,10 @@ from decimal import Decimal, ROUND_HALF_DOWN
 from functools import cached_property
 from pathlib import Path
 from typing import Dict
-from zipfile import BadZipFile
 
-from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment
 
-from base.execution import FileExecution
+from base.execution import WorkbookExecution
 from exceptions import ValidationException
 from execution.xml_file import XmlFile, XmlNode
 from functions import normalize_number, decimal_property
@@ -18,7 +16,7 @@ from logger import logger
 from models import Cliente
 
 
-class MonthSummary(FileExecution):
+class MonthSummary(WorkbookExecution):
     columns_row = 4
     column_data = 4
 
@@ -54,28 +52,16 @@ class MonthSummary(FileExecution):
         return Path(f'{self.workdir}/{self.client.rfc}/{filename}.xlsx')
 
     @cached_property
-    def workbook(self):
-        if self.filename.exists():
-            try:
-                workbook = load_workbook(self.filename)
-            except PermissionError:
-                raise ValidationException(f'Cierre el archivo antes de ejecutar\n{self.filename}')
-            except BadZipFile:
-                raise ValidationException(f'Hay un problema con el archivo\n{self.filename}')
-        else:
-            workbook = Workbook()
-            workbook.remove(workbook.active)
-
-        return workbook
-
-    @cached_property
     def sheet(self):
         sheet_name = month_name[self.month].capitalize()
         sheet = self.get_sheet(sheet_name)
+        replace_sheet = sheet is not None
 
-        if sheet:
+        if replace_sheet:
             self.workbook.remove(sheet)
-            sheet = self.workbook.create_sheet(sheet_name)
+
+        sheet = self.workbook.create_sheet(sheet_name)
+        logger.info(f'{self.__class__.__name__} {'replacing' if replace_sheet else 'generating'} {sheet_name}')
 
         sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
         return sheet

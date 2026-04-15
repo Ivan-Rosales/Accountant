@@ -78,6 +78,8 @@ class QConfiguration(BaseWidget):
 
     def on_change(self, label, value):
         if self.last == (label, value): return
+        logger.debug(f'Change configuration {label} to {value}')
+
         settings.setValue(label, value)
         self.change_configuration.emit(label, value)
         self.last = (label, value)
@@ -86,6 +88,8 @@ class QConfiguration(BaseWidget):
         return self.get_value(self.widgets[label])
 
     def get_value(self, widget):
+        logger.debug(f'Getting configuration {widget.__class__.__name__}')
+
         if isinstance(widget, QDirSelector):
             return str(widget.get_path())
         elif isinstance(widget, QThemePicker):
@@ -95,6 +99,8 @@ class QConfiguration(BaseWidget):
         return None
 
     def set_value(self, widget, value):
+        logger.debug(f'Setting configuration {widget.__class__.__name__} with value {value}')
+
         if isinstance(widget, QDirSelector):
             widget.setPlaceholderText(value)
             widget.setPath(value)
@@ -116,3 +122,5 @@ class QConfiguration(BaseWidget):
             widget = description.get('widget')
             default_value = description.get('default')
             self.set_value(widget, default_value)
+
+        logger.info(f'{self.__class__.__name__} reset configuration to default')

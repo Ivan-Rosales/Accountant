@@ -32,5 +32,4 @@ if not os.path.exists(ICON_PATH):
 
 if DEBUG:
     now = datetime.now()
-    logger.setLevel(logging.DEBUG)
     logger.debug(f'Debug mode is active {DEBUG}')

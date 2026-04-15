@@ -14,8 +14,10 @@ class YearSummaryWorker(QObject):
 
         try:
             year_summary = YearSummary(client, year)
-            year_summary.generate_sheet(month)
-            year_summary.save()
+            sheet = year_summary.generate_sheet(month)
+            year_summary.order_sheets()
+
+            year_summary.set_active_sheet(sheet.title)
 
             self.progress.emit(1)
             self.success.emit(year_summary)

@@ -2,7 +2,6 @@ from PySide6.QtWidgets import QMessageBox, QStyle, QLabel, QGridLayout, QHBoxLay
 
 from app.widgets.common import spacer
 from base.dialog import BaseDialog
-from logger import logger
 
 
 class QMessageDialog(BaseDialog):
@@ -50,6 +49,8 @@ class QMessageDialog(BaseDialog):
         for label in self.default_buttons:
             button = QPushButton(label.capitalize())
             button.clicked.connect(lambda name=label, *args, **kwargs: self.on_click(name))
+            button.setMinimumWidth(50)
+
             self.buttons.addWidget(button)
 
             normalize_name = label.replace(' ', '_')
@@ -59,9 +60,7 @@ class QMessageDialog(BaseDialog):
 
     def setIcon(self, icon_enum):
         icon = self.icon_map.get(icon_enum)
-        if icon is None:
-            logger.info(f'{icon_enum} is not defined')
-            return
+        if icon is None: return
 
         style = self.style()
         pixmap = style.standardIcon(icon).pixmap(48, 48)
@@ -95,7 +94,7 @@ class QMessageDialog(BaseDialog):
             self.adjustSize()
 
             message = 'ocultar detalles'.capitalize() if is_visible else self.details.capitalize()
-            self.btn_mostrar_detalles.setText(message)
+            self.detailed_text.setText(message)
             return
 
         self.hide()

@@ -25,5 +25,5 @@ class ZipFile:
         zip_file.extractall(self.extract_path)
         zip_file.close()
 
-        logger.info(f'extracted {self.path} file in {self.extract_path}')
+        logger.info(f'Extracted {self.path} file in {self.extract_path}')
         return self.extract_path
