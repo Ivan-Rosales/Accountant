@@ -1,13 +1,16 @@
+import os
+import sys
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.settings import BASE_PATH
 
-def to_bool(string_bool):
-    string_bool = string_bool.strip().lower()
-    return string_bool in ("true", "1", "yes", "y", "on")
+
+def assets_path():
+    return getattr(sys, '_MEIPASS', os.path.abspath("."))
 
 
 def get_icon(icon):
-    return f'assets/icons/{icon}.png'
+    return f'{BASE_PATH}\\assets\\icons\\{icon}.png'
 
 
 def decimal_property(func):

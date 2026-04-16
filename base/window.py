@@ -7,7 +7,7 @@ from app.core.settings import settings
 from app.mixin.loadui import LoadUiMixin
 from app.mixin.property_update import PropertyMixin
 from app.mixin.title_bar import TitleBarMixin
-from app.settings import DEFAULT_THEME
+from app.settings import DEFAULT_THEME, QSS_PATH
 from logger import logger
 
 THEMES = {
@@ -20,7 +20,7 @@ THEMES = {
 
 
 class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
-    style_sheets = 'assets/qss/*.qss'
+    style_sheets = QSS_PATH
     _load_qs = True
 
     def __init__(self, *args, **kwargs):
@@ -48,7 +48,8 @@ class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
         logger.info(f'Set application theme {self.theme}')
 
         if isinstance(self.style_sheets, str):
-            self.style_sheets = list(Path().glob(self.style_sheets))
+            path = Path(self.style_sheets)
+            self.style_sheets = list(path.parent.glob(path.name))
 
         if isinstance(self.style_sheets, (list, tuple)):
             for style_sheet_path in self.style_sheets:
