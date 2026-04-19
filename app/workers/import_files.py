@@ -41,7 +41,7 @@ class XmlFileFake:
 class ImportFilesWorker(QObject):
     start = Signal(Path, dict)
     success = Signal(object)
-    progress = Signal(float, int)
+    progress = Signal(float, int, object)
     error = Signal(object)
 
     files = []
@@ -60,7 +60,7 @@ class ImportFilesWorker(QObject):
 
     def generate_new_files(self):
         n_files = len(self.files)
-        self.progress.emit(0, n_files)
+        self.progress.emit(0, n_files, None)
 
         summary = {}
 
@@ -80,7 +80,7 @@ class ImportFilesWorker(QObject):
                 else:
                     self.generate_month_file(file)
 
-                self.progress.emit(c / n_files, n_files)
+                self.progress.emit(c / n_files, n_files, file)
                 summary[file] = True, None
             except Exception as error:
                 summary[file] = False, error
@@ -152,7 +152,7 @@ class ImportFilesWorker(QObject):
 
         sheet = workbook.active
 
-        kind = (sheet.cell(row=2, column=1).value or '').lower() == 'ingresos'
+        kind = 'ingresos' in (sheet.cell(row=2, column=1).value or '').lower()
 
         max_row = sheet.max_row
         for row in sheet.iter_rows(min_row=6, max_row=max_row, min_col=1, max_col=3):

@@ -55,6 +55,12 @@ class QImportWidget(AsyncExecutionMixin, BaseWidget):
         super().on_progress(progress)
         self.execute_btn.setText(f'{int(progress * total)}/{total} archivos')
 
+        try:
+            file = args[1]
+            self.execute_btn.setText(f'{int(progress * total)}/{total} archivos\n{file}')
+        except:
+            pass
+
     def on_success(self, summary):
         self.execute_btn.setText(self.default_label)
         self.execute_btn.setEnabled(True)
