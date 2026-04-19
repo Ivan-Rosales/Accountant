@@ -88,6 +88,7 @@ class MainWindow(BaseWindow):
         conf.register_change('dbdir', database_worker.reset)
         conf.register_change('theme', self.load_qss)
         self.load_qss(conf.get_conf_value('theme'))
+        self.header.setFocus()
 
     def get_widget_tab(self, name):
         _, widget = self._tabs[name]
