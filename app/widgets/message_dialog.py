@@ -9,6 +9,7 @@ class QMessageDialog(BaseDialog):
     icon_map = {
         QMessageBox.Icon.Warning: QStyle.StandardPixmap.SP_MessageBoxWarning,
         QMessageBox.Icon.Question: QStyle.StandardPixmap.SP_MessageBoxQuestion,
+        QMessageBox.Icon.Information: QStyle.StandardPixmap.SP_MessageBoxInformation,
     }
 
     windows_size = (600, 100)
@@ -48,7 +49,7 @@ class QMessageDialog(BaseDialog):
 
         for label in self.default_buttons:
             button = QPushButton(label.capitalize())
-            button.clicked.connect(lambda name=label, *args, **kwargs: self.on_click(name))
+            button.clicked.connect(lambda widget=button, name=label, *args, **kwargs: self.on_click(widget, name))
             button.setMinimumWidth(50)
 
             self.buttons.addWidget(button)
@@ -87,14 +88,14 @@ class QMessageDialog(BaseDialog):
     def setDefaultButton(self, *_, **__):
         pass
 
-    def on_click(self, name):
+    def on_click(self, widget, name):
         if name == self.details:
             is_visible = not self.detailed_text.isVisible()
             self.detailed_text.setVisible(is_visible)
             self.adjustSize()
 
             message = 'ocultar detalles'.capitalize() if is_visible else self.details.capitalize()
-            self.detailed_text.setText(message)
+            widget.setText(message)
             return
 
         self.hide()

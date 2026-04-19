@@ -70,6 +70,7 @@ class YearSummary(WorkbookExecution):
 
         sheet.cell(row=11, column=1).value = f'total de ingresos de {prev_name}'.upper()
         sheet.cell(row=18, column=1).value = f'total de egresos de {prev_name}'.upper()
+        sheet.cell(row=26, column=4).value = 'pago'.upper()
 
     def set_labels(self, sheet, month):
         def get_totals_label(label) -> str:
@@ -129,6 +130,10 @@ class YearSummary(WorkbookExecution):
 
         return total_ingresos, total_egresos, total_iva
 
+    def get_month_file(self, month, kind=''):
+        rev = kind == 'ingresos'
+        return MonthSummary(self.client, year=self.year, month=month, rev=rev)
+
     def set_data(self, sheet, month, previous=None):
         if isinstance(previous, (list, tuple)) and len(previous) == 3:
             prev_ingresos, prev_egresos, prev_iva = previous
@@ -136,7 +141,7 @@ class YearSummary(WorkbookExecution):
             prev_ingresos, prev_egresos, prev_iva = self.get_prev_data(month)
 
         # Ingresos
-        ingresos_file = MonthSummary(self.client, year=self.year, month=month, rev=True)
+        ingresos_file = self.get_month_file(month, 'ingresos')
         sheet.cell(row=6, column=2).value = ingresos_file.subtotal
         sheet.cell(row=6, column=5).value = ingresos_file.iva
 
@@ -151,7 +156,7 @@ class YearSummary(WorkbookExecution):
             sheet.cell(row=14, column=2).value = ingresos_file.ieps
 
         # Egresos
-        egresos_file = MonthSummary(self.client, year=self.year, month=month)
+        egresos_file = self.get_month_file(month, 'egresos')
         sheet.cell(row=7, column=2).value = egresos_file.subtotal
         sheet.cell(row=7, column=5).value = egresos_file.iva
 

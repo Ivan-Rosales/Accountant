@@ -103,7 +103,9 @@ class MonthSummary(WorkbookExecution):
         xml_files.sort(key=lambda x: x.date)
 
         self.xml_files = {i.uuid: i for i in xml_files}
+        self.process_files()
 
+    def process_files(self):
         for xml_file in self.xml_files.values():
             self.validate_file(xml_file)
             self.add_file(xml_file)
@@ -244,9 +246,7 @@ class MonthSummary(WorkbookExecution):
         if sheet is None: return Decimal(0)
 
         title_row = sheet[self.columns_row]
-        included_title = fields
-
-        cols = [i.column for i in title_row if isinstance(i.value, str) and i.value.lower() in included_title]
+        cols = [i.column for i in title_row if isinstance(i.value, str) and i.value.lower() in fields]
         values = [Decimal(sheet.cell(row=sheet.max_row, column=column).value) for column in cols]
         return sum(values)
 

@@ -1,13 +1,14 @@
 from functools import cached_property
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QVBoxLayout, QGridLayout, QLabel
+from PySide6.QtWidgets import QVBoxLayout, QGridLayout, QLabel, QWidget
 
 from app.core.settings import settings
 from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR
 from app.widgets.color_picker import QThemePicker
 from app.widgets.common import QButton, spacer
 from app.widgets.file_selector import QDirSelector
+from app.widgets.import_files import QImportWidget
 from base.tab import TabWidget
 from functions import get_icon
 from logger import logger
@@ -43,6 +44,16 @@ class QConfiguration(TabWidget):
         return {label: desc['widget'] for label, desc in self.fields.items() if desc.get('widget')}
 
     def create_ui(self):
+        self.special_actions = QWidget()
+        self.special_actions.setFixedHeight(60)
+        self.special_actions_layout = QVBoxLayout()
+        self.special_actions_layout.setContentsMargins(4, 4, 4, 4)
+        self.special_actions.setProperty('class', 'border')
+        self.special_actions.setLayout(self.special_actions_layout)
+
+        self.import_widget = QImportWidget(self)
+        self.special_actions_layout.addWidget(self.import_widget)
+
         for label, description in self.fields.items():
             widget_class = description.get('widget')
             widget = widget_class(self) if widget_class else None
@@ -76,10 +87,11 @@ class QConfiguration(TabWidget):
             fields_layout.addWidget(widget)
         fields_layout.addItem(spacer)
 
-        layout.addLayout(fields_layout, 0, 0, 1, 2)
-        layout.addWidget(self.label, 1, 0, 1, 2)
-        layout.addWidget(self.save_btn, 2, 0)
-        layout.addWidget(self.reset_btn, 2, 1)
+        layout.addWidget(self.special_actions, 0, 0, 1, 2)
+        layout.addLayout(fields_layout, 1, 0, 1, 2)
+        layout.addWidget(self.label, 2, 0, 1, 2)
+        layout.addWidget(self.save_btn, 3, 0)
+        layout.addWidget(self.reset_btn, 3, 1)
 
     def on_change(self, label, value):
         self.touched[label] = value
