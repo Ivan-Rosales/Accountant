@@ -24,7 +24,7 @@ exe = EXE(
     a.datas,
     [],
     name='Contabilidad',
-    icon='assets/icon.ico',
+    icon='assets/favicon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

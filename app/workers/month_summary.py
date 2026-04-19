@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, Signal
 
 from execution.month_summary import MonthSummary
+from execution.month_summary_providers import MonthSummaryProviders
 from execution.zip_file import ZipFile
 from models import Cliente
 
@@ -42,7 +43,10 @@ class MonthSummaryWorker(QObject):
                 if create_providers:
                     self.progress.emit((c * 2 - 1) / n_files)
 
-                    summary.generate_providers()
+                    summary_providers = MonthSummaryProviders(client)
+                    summary_providers.add_files_in_folder(data_path)
+                    summary_providers.save()
+
                     self.progress.emit(c * 2 / n_files)
                 else:
                     self.progress.emit(c / n_files)

@@ -1,11 +1,12 @@
 from PySide6.QtWidgets import QVBoxLayout, QCheckBox
 
+from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
 from app.widgets.common import spacer, QProgressButton
 from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
-from app.workers.month_summary_worker import MonthSummaryWorker
+from app.workers.month_summary import MonthSummaryWorker
 from base.tab import TabWidget
 from logger import logger
 
@@ -23,6 +24,13 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
         self.metrics = QMetrics(self)
         self.execute_btn = QProgressButton('ejecutar', self, fn=self.start_worker)
         self.execute_btn.setProperty('class', 'primary')
+
+        settings.register_setting(
+            'check-providers',
+            self.prov_check.isChecked,
+            lambda x: self.prov_check.setChecked(x == 'true'),
+            'false',
+        )
 
     def load_ui(self, layout):
         layout.addItem(spacer)

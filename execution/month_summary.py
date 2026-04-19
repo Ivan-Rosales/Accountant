@@ -1,4 +1,3 @@
-import csv
 from calendar import month_name
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_DOWN
@@ -10,7 +9,7 @@ from openpyxl.styles import Alignment
 
 from base.execution import WorkbookExecution
 from exceptions import ValidationException
-from execution.xml_file import XmlFile, XmlNode
+from execution.xml_file import XmlFile
 from functions import normalize_number, decimal_property
 from logger import logger
 from models import Cliente
@@ -138,7 +137,7 @@ class MonthSummary(WorkbookExecution):
 
         self.columns_set = True
 
-    def add_file(self, xml: XmlFile):
+    def add_file(self, xml: XmlFile, row=None):
         if not self.header_set: self.set_header(xml)
         if not self.columns_set: self.set_columns()
 
@@ -148,7 +147,7 @@ class MonthSummary(WorkbookExecution):
         if xml.tipo == 'N': return
 
         kind = self.rev
-        row = max([6, self.sheet.max_row + 1])
+        row = row or max([6, self.sheet.max_row + 1])
 
         self.sheet.cell(row=row, column=1).value = xml.date
         self.sheet.cell(row=row, column=2).value = (xml.receptor.name if kind else xml.emisor.name).upper()
@@ -223,7 +222,7 @@ class MonthSummary(WorkbookExecution):
             for column in range(self.column_data, self.sheet.max_column + 1):
                 self.sheet.cell(row=row, column=column).number_format = self.NUMBER_FORMAT
 
-    def set_footer(self):
+    def set_footer(self, total_offset=0):
         min_col = self.column_data
         max_row = self.sheet.max_row
         min_row = self.columns_row + 2
@@ -232,9 +231,10 @@ class MonthSummary(WorkbookExecution):
         summaries = defaultdict(Decimal)
         for row in self.sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
             for cell in row:
+                if not isinstance(cell.value, Decimal): continue
                 summaries[cell.column] += cell.value
 
-        max_row += 2
+        max_row += 2 + total_offset
         for column, total in summaries.items():
             self.sheet.cell(row=max_row, column=column).value = total
 
@@ -267,29 +267,6 @@ class MonthSummary(WorkbookExecution):
 
     def from_file(self, filepath):
         self._file = filepath
-
-    def generate_providers(self):
-        providers = defaultdict(list)
-        for xml_file in self.xml_files.values():
-            person: XmlNode = xml_file.receptor if self.rev else xml_file.emisor
-            providers[person].append(xml_file)
-
-        kind = 'ingresos' if self.rev else 'egresos'
-        filename = f'{self.client.rfc} {self.year} {self.month} {kind}'.upper()
-        filename = Path(f'{self.workdir}/{self.client.rfc}/proveedores/{filename}.txt')
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        file = open(filename, 'w', newline='')
-
-        try:
-            writer = csv.writer(file, delimiter='|')
-            for person, xml_files in providers.items():
-                row = RowProviders(person, xml_files)
-                writer.writerow(row.csv_row())
-                writer.writerow(row.csv_row())
-        finally:
-            file.close()
-
-        logger.info(f'{self.__class__.__name__} providers saved in {self.filename}')
 
     def save(self):
         if len(self.xml_files.keys()) == 0:

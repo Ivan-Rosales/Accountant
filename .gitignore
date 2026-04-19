@@ -6,4 +6,4 @@ build/
 
 db.sqlite3*
 
-test/core/xml_test.xml
+app/test/core/xml_test.xml
