@@ -13,10 +13,6 @@ class QTableModel(ModelMixin, BaseWidget):
         'id': 0.2,
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._rendered = False
-
     def create_ui(self):
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(self.fields))
@@ -35,12 +31,29 @@ class QTableModel(ModelMixin, BaseWidget):
     def load_ui(self, layout):
         layout.addWidget(self.table)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        if self._rendered: return
-        self._rendered = True
+    def filter_rows_by_text(self, text):
+        def filter_func(instance):
+            uuid_string = getattr(instance, '_uuid_string', None)
 
-        table_width = self.table.viewport().width()
+            if uuid_string is None:
+                uuid_string = ' '.join([str(getattr(instance, i.name)) for i in self.fields])
+                setattr(instance, '_uuid_string', uuid_string)
+
+            return text.lower() in uuid_string.lower()
+
+        self.filter_rows(filter_func)
+
+    def filter_rows(self, filter_func):
+        for row in range(self.table.rowCount()):
+            instance = self.get_row_instance(row)
+            self.table.setRowHidden(row, not filter_func(instance))
+
+    def clear_filter(self):
+        for row in range(self.table.rowCount()):
+            self.table.setRowHidden(row, False)
+
+    def resize_columns(self):
+        table_width = self.table.viewport().width() * 0.98
         flexs = [self.flex.get(col.lower(), 1) for col in self.headers_labels]
         count_flex = sum(flexs)
 
@@ -59,6 +72,8 @@ class QTableModel(ModelMixin, BaseWidget):
 
         for instance in instances:
             self.create_row(instance)
+
+        self.resize_columns()
 
     def get_selection(self):
         return self.table.selectionModel().selectedRows()

@@ -1,8 +1,11 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal, QStringListModel, QTimer
 from PySide6.QtWidgets import QComboBox, QCompleter
 
 from app.core.settings import settings
 from app.mixin.model import ModelMixin
+from app.settings import QSS_PATH
 from base.widget import BaseWidget
 
 
@@ -16,12 +19,19 @@ class QSelectorModel(ModelMixin, BaseWidget):
         self.list.setEditable(True)
         self.list.lineEdit().editingFinished.connect(self.reset_text)
         self.list.focusInEvent = self.on_focus_in
+        self.list.focusOutEvent = self.on_focus_out
 
         self.completer = QCompleter(self)
         self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
         self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self.list.setCompleter(self.completer)
+        self.completer.complete()
+        raw_style_sheet = Path(QSS_PATH).with_name('combo_box.qss').read_text()
+        style_sheet = raw_style_sheet.replace('QComboBox ', '')
+        style_sheet = style_sheet[style_sheet.index('}') + 1:]
+        self.completer.popup().setStyleSheet(style_sheet)
+        self.completer.popup().hide()
 
         parent = self.parent()
         parent_name = parent.__class__.__name__
@@ -39,6 +49,10 @@ class QSelectorModel(ModelMixin, BaseWidget):
         if self.searching: return
         self.searching = True
         QTimer.singleShot(0, self.list.lineEdit().selectAll)
+
+    def on_focus_out(self, event):
+        QComboBox.focusOutEvent(self.list, event)
+        self.searching = False
 
     def reset_text(self):
         self.searching = False

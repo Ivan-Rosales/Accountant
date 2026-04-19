@@ -32,8 +32,18 @@
     border-left: 5px solid {{color}};
 }
 
+/* TableControllers */
+
 #TableControllers > QLabel {
     font-weight: bold;
+}
+
+#TableControllers > QLineEdit {
+    border-top-right-radius: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right-width: 0;
+    height: 16px;
 }
 
 #TableControllers > QPushButton {
@@ -46,6 +56,10 @@
 
 #TableControllers > QPushButton[position~="last"] {
     border-top-right-radius: 6px;
+}
+
+#TableControllers > QPushButton[open~="true"] {
+    border-top-left-radius: 0;
 }
 
 *[scope~="table"],

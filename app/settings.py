@@ -10,8 +10,8 @@ from logger import logger
 load_dotenv()
 
 DEBUG = os.getenv("DEBUG", 'False') == 'True'
-
-SHOW_BORDER = False
+SHOW_PATHS = os.getenv("SHOW_PATHS", 'False') == 'True'
+SHOW_BORDER = os.getenv("SHOW_BORDER", 'False') == 'True'
 
 ORGANIZATION_NAME = 'synop'
 APPLICATION_NAME = 'accountant'
