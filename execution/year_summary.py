@@ -122,9 +122,9 @@ class YearSummary(WorkbookExecution):
         sheet = self.get_sheet(name)
         if sheet is None: sheet = self.generate_sheet(month)
 
-        total_ingresos = Decimal(sheet.cell(row=12, column=5).value)
-        total_egresos = Decimal(sheet.cell(row=19, column=5).value)
-        total_iva = Decimal(sheet.cell(row=26, column=2).value)
+        total_ingresos = Decimal(sheet.cell(row=12, column=5).value or 0)
+        total_egresos = Decimal(sheet.cell(row=19, column=5).value or 0)
+        total_iva = Decimal(sheet.cell(row=26, column=2).value or 0)
 
         logger.debug(f'{self.__class__.__name__} got data from {name} ({total_ingresos}, {total_egresos}, {total_iva})')
 
