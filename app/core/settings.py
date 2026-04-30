@@ -1,9 +1,12 @@
 from pathlib import Path
 
+import toml
 from PySide6.QtCore import QSettings as QBaseSettings
 
 from app import settings as base_settings
 from logger import logger
+
+config = toml.load('pyproject.toml')
 
 
 class QSettings(QBaseSettings):
@@ -17,6 +20,8 @@ class QSettings(QBaseSettings):
         'workdir': base_settings.DEFAULT_WORK_DIR,
         'dbdir': base_settings.DEFAULT_DATABASE_DIR,
     }
+
+    version = config['project']['version']
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:

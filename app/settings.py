@@ -22,6 +22,8 @@ DOCUMENTS_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.
 
 DEFAULT_WORK_DIR = f'{DOCUMENTS_DIR}/concentrados'
 DEFAULT_DATABASE_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/db.sqlite3'
+LOGS_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/logs/'
+
 DEFAULT_THEME = 'azul'
 
 ICON_PATH = f'{BASE_PATH}\\assets\\icon.svg'

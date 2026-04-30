@@ -1,5 +1,9 @@
+from pathlib import Path
+from typing import List
+
 from PySide6.QtCore import QObject, Signal
 
+from app.core.excepthook import Log
 from execution.month_summary import MonthSummary
 from execution.month_summary_providers import MonthSummaryProviders
 from execution.zip_file import ZipFile
@@ -23,7 +27,7 @@ class MonthSummaryWorker(QObject):
 
         return base_steps
 
-    def on_start(self, paths, client: Cliente, params=None):
+    def on_start(self, paths: List[Path], client: Cliente, params=None):
         params = self.default_params | (params or {})
         create_providers = params['create_providers']
 
@@ -53,4 +57,10 @@ class MonthSummaryWorker(QObject):
 
             self.success.emit(summary, n_files)
         except Exception as error:
+            log = Log(
+                'month_summary',
+                {'paths': [str(p.absolute()) for p in paths], 'client': client.to_dict(), 'params': params},
+                paths,
+            )
+            setattr(error, 'log', log)
             self.error.emit(error)

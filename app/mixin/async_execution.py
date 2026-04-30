@@ -41,7 +41,11 @@ class AsyncExecutionMixin:
         return True
 
     def start_worker(self):
-        data = self.validate_data()
+        try:
+            data = self.validate_data()
+        except Exception as error:
+            raise QDialogException(self, str(error), format=False) from error
+
         if data is None: return
 
         logger.info(f'{self.__class__.__name__} start, data: {data}')

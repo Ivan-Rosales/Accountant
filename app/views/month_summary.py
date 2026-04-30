@@ -43,13 +43,13 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()
-        get_paths = self.selector.get_files()
+        paths = self.selector.get_files()
 
         params = {
             'create_providers': self.prov_check.isChecked(),
         }
 
-        return get_paths, client, params
+        return paths, client, params
 
     def on_success(self, summary, n_files):
         logger.debug(f'{self.__class__.__name__} generation success {summary} {n_files}')

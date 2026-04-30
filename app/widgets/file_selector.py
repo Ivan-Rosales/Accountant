@@ -4,8 +4,8 @@ from pathlib import Path
 from PySide6.QtWidgets import QLineEdit, QFileDialog
 
 from app.mixin.property_update import PropertyMixin
-from base.popup import QDialogException
 from base.widget import BaseWidget
+from exceptions import ValidationException
 
 
 class QFilesSelector(PropertyMixin, BaseWidget):
@@ -35,7 +35,7 @@ class QFilesSelector(PropertyMixin, BaseWidget):
 
     def get_files(self) -> list[Path]:
         if self.files is None:
-            raise QDialogException(self, 'seleccione al menos un archivo')
+            raise ValidationException('seleccione al menos un archivo')
 
         return [Path(i) for i in self.files]
 

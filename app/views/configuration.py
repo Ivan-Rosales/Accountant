@@ -63,6 +63,9 @@ class QConfiguration(TabWidget):
 
         self.widgets['dbdir'].with_file('db.sqlite3')
 
+        self.label_version = QLabel(f'version {settings.version}'.capitalize(), self)
+        self.label_version.setProperty('class', 'secondary')
+
         self.label = QLabel('hay cambios sin guardar'.capitalize(), self)
         self.label.setProperty('class', 'invalid')
         self.label.hide()
@@ -85,11 +88,12 @@ class QConfiguration(TabWidget):
 
             widget = description['widget']
             fields_layout.addWidget(widget)
+        fields_layout.addWidget(self.label)
         fields_layout.addItem(spacer)
 
         layout.addWidget(self.special_actions, 0, 0, 1, 2)
         layout.addLayout(fields_layout, 1, 0, 1, 2)
-        layout.addWidget(self.label, 2, 0, 1, 2)
+        layout.addWidget(self.label_version, 2, 0, 1, 2)
         layout.addWidget(self.save_btn, 3, 0)
         layout.addWidget(self.reset_btn, 3, 1)
 

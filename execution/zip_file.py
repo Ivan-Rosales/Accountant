@@ -26,4 +26,6 @@ class ZipFile:
         zip_file.close()
 
         logger.info(f'Extracted {self.path} file in {self.extract_path}')
+        if not self.path.name.startswith('success'):
+            self.path.rename(self.path.with_name(f'success - {self.path.name}'))
         return self.extract_path

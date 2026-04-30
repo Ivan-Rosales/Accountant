@@ -1,6 +1,8 @@
 from PySide6.QtCore import QObject, Signal
 
+from app.core.excepthook import Log
 from execution.year_summary import YearSummary
+from models import Cliente
 
 
 class YearSummaryWorker(QObject):
@@ -9,7 +11,7 @@ class YearSummaryWorker(QObject):
     progress = Signal(float)
     error = Signal(object)
 
-    def on_start(self, client, year, month):
+    def on_start(self, client: Cliente, year, month):
         self.progress.emit(0)
 
         try:
@@ -22,4 +24,6 @@ class YearSummaryWorker(QObject):
             self.progress.emit(1)
             self.success.emit(year_summary)
         except Exception as error:
+            log = Log('year_summary', {'client': client.to_dict(), 'year': year, 'month': month})
+            setattr(error, 'log', log)
             self.error.emit(error)

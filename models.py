@@ -17,6 +17,10 @@ class Cliente(DatabaseWorker.base, ModelMixin):
     def __str__(self):
         return f'({self.rfc}) {self.fullname()}'
 
+    def to_dict(self):
+        return {'id': self.id, 'rfc': self.rfc, 'nombre': self.nombre, 'apellido_paterno': self.apellido_paterno,
+                'apellido_materno': self.apellido_materno}
+
 
 class Metrica(DatabaseWorker.base, ModelMixin):
     id = Column(Integer, primary_key=True)
