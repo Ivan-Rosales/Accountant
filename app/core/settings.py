@@ -4,9 +4,10 @@ import toml
 from PySide6.QtCore import QSettings as QBaseSettings
 
 from app import settings as base_settings
+from app.settings import BASE_PATH
 from logger import logger
 
-config = toml.load('pyproject.toml')
+config = toml.load(f'{BASE_PATH}\\pyproject.toml')
 
 
 class QSettings(QBaseSettings):

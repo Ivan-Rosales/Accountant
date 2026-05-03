@@ -5,6 +5,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        ('pyproject.toml', '.'),
         ('assets/*', 'assets'),
     ],
     hiddenimports=[],
