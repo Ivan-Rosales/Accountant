@@ -23,5 +23,7 @@ def try_update():
 
         pid = os.getpid()
         subprocess.Popen([f'{BASE_PATH}\\updater.exe', url, str(sys.executable), str(pid)])
-    except:
-        pass
+    except Exception as e:
+        log_update = open('log_update.log', 'w')
+        log_update.write(str(e))
+        log_update.close()

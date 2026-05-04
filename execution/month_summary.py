@@ -247,7 +247,7 @@ class MonthSummary(WorkbookExecution):
 
         title_row = sheet[self.columns_row]
         cols = [i.column for i in title_row if isinstance(i.value, str) and i.value.lower() in fields]
-        values = [Decimal(sheet.cell(row=sheet.max_row, column=column).value) for column in cols]
+        values = [Decimal(sheet.cell(row=sheet.max_row, column=column).value or 0) for column in cols]
         return sum(values)
 
     @cached_property

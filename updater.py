@@ -69,13 +69,13 @@ class Updater:
     def update(self, path):
         self.close_main()
 
-        for i in range(5):
+        for i in range(25):
             try:
                 shutil.move(path, exe_path)
                 print("\nReplace complete", str(path.absolute()), exe_path)
                 break
             except:
-                time.sleep(5)
+                time.sleep(1)
 
         time.sleep(10)
 
