@@ -5,11 +5,14 @@ from PySide6 import QtWidgets
 from PySide6.QtCore import QThread
 
 from app.core.excepthook import except_hook
+from app.core.launch import try_update
 from app.test.core.test_runner import start_test
 from app.workers.database import database_worker
-from main import MainWindow
+from window import MainWindow
 
 if __name__ == "__main__":
+    try_update()
+
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
     if '--test' in sys.argv:

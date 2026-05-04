@@ -5,6 +5,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        ('dist/updater.exe', '.'),
         ('pyproject.toml', '.'),
         ('assets/*', 'assets'),
     ],

@@ -28,6 +28,7 @@ DEFAULT_THEME = 'azul'
 
 ICON_PATH = f'{BASE_PATH}\\assets\\icon.svg'
 QSS_PATH = f'{BASE_PATH}\\assets\\qss\\*.qss'
+TOML_PATH = f'{BASE_PATH}\\pyproject.toml'
 
 if not os.path.exists(ICON_PATH):
     logger.warn('the base icon file does not exist')
