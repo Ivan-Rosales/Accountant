@@ -16,10 +16,11 @@ if __name__ == "__main__":
     if '--test' in sys.argv:
         sys.argv.pop(sys.argv.index('--test'))
         start_test()
-        exit()
+        sys.exit(0)
+
+    try_update()
 
     sys.excepthook = except_hook
-    try_update()
 
     app = QtWidgets.QApplication([])
 

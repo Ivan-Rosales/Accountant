@@ -15,6 +15,8 @@ SHOW_BORDER = os.getenv("SHOW_BORDER", 'False') == 'True'
 
 ORGANIZATION_NAME = 'synop'
 APPLICATION_NAME = 'accountant'
+REPO_URL = os.getenv('REPO_URL', 'https://api.github.com/repos/Ivan-Rosales/Accountant/releases/latest')
+AUTO_UPDATE = os.getenv("AUTO_UPDATE", 'True') == 'True'
 
 BASE_PATH = getattr(sys, '_MEIPASS', os.path.abspath("."))
 APPDATA_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
