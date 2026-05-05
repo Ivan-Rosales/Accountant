@@ -5,7 +5,11 @@ import sys
 import requests
 
 from app.core.settings import config
-from app.settings import BASE_PATH
+from app.settings import BASE_PATH, DEBUG
+
+
+class UpdatingException(Exception):
+    pass
 
 
 def try_update():
@@ -22,8 +26,11 @@ def try_update():
         url = asset['browser_download_url']
 
         pid = os.getpid()
-        subprocess.Popen([f'{BASE_PATH}\\updater.exe', url, str(sys.executable), str(pid)])
+        subprocess.Popen([f'{BASE_PATH}\\updater.exe', url, str(sys.executable), str(pid), last_version])
     except Exception as e:
         log_update = open('log_update.log', 'w')
         log_update.write(str(e))
         log_update.close()
+
+    if not DEBUG:
+        raise UpdatingException('Updating...')

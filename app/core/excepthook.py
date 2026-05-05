@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from app.core.launch import UpdatingException
 from app.settings import LOGS_DIR
 from app.widgets.message_dialog import QMessageDialog
 from base.popup import QDialogException
@@ -20,6 +21,8 @@ class Log:
 
 
 def except_hook(exc_type, exc_value, exc_traceback):
+    if isinstance(exc_value, UpdatingException): return
+
     if not isinstance(exc_value, QDialogException):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return

@@ -11,8 +11,6 @@ from app.workers.database import database_worker
 from window import MainWindow
 
 if __name__ == "__main__":
-    try_update()
-
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
     if '--test' in sys.argv:
@@ -21,6 +19,7 @@ if __name__ == "__main__":
         exit()
 
     sys.excepthook = except_hook
+    try_update()
 
     app = QtWidgets.QApplication([])
 
