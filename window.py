@@ -19,7 +19,7 @@ from models import Cliente
 
 class MainWindow(BaseWindow):
     layout_class = QGridLayout
-    windows_size = (801, 401)
+    windows_size = (801, 451)
     margin = (0, 32, 0, 0)
     spacing = 0
 

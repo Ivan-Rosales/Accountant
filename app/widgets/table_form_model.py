@@ -22,13 +22,16 @@ class QTableFormModelControllers(ModelMixin, BaseWidget, PropertyMixin):
         set_visible = not self.line_edit.isVisible()
         self.setPropertyUpddate(self.search_btn, 'open', 'true' if set_visible else 'false')
         self.line_edit.setVisible(set_visible)
-        if set_visible: self.line_edit.setFocus()
-        else: self.line_edit.clear()
+        if set_visible:
+            self.line_edit.setFocus()
+        else:
+            self.line_edit.clear()
 
     def create_ui(self):
         parent = self.parent()
+        model_name = self.model.__name__
 
-        self.label = QLabel(self.model.__name__, self)
+        self.label = QLabel(model_name, self)
 
         self.line_edit = QLineEdit(self)
         self.line_edit.textChanged.connect(parent.table.filter_rows_by_text)
@@ -36,19 +39,30 @@ class QTableFormModelControllers(ModelMixin, BaseWidget, PropertyMixin):
 
         self.search_btn = QButton(get_icon('search'), self, fn=self.search_toggle)
         self.search_btn.setProperty('position', 'first')
+        self.search_btn.setToolTip('Buscar...')
+
+        self.reset_btn = QButton(get_icon('column'), self, fn=parent.table.resize_columns)
+        self.reset_btn.setProperty('position', 'middle')
+        self.reset_btn.setToolTip('Reiniciar ancho de columnas')
 
         self.create_btn = QButton(get_icon('plus'), self, fn=parent.create_fn)
         self.create_btn.setProperty('position', 'middle')
+        self.create_btn.setToolTip(f'Añadir {model_name}')
+
         self.update_btn = QButton(get_icon('pencil'), self, fn=parent.update_fn)
         self.update_btn.setProperty('position', 'middle')
+        self.update_btn.setToolTip(f'Actualizar {model_name}')
+
         self.delete_btn = QButton(get_icon('trash'), self, fn=parent.delete_fn)
         self.delete_btn.setProperty('position', 'last')
+        self.delete_btn.setToolTip(f'Borrar {model_name}')
 
     def load_ui(self, layout: QHBoxLayout):
         layout.addWidget(self.label, 10)
         layout.addWidget(self.line_edit)
         layout.addWidget(self.search_btn)
 
+        layout.addWidget(self.reset_btn)
         layout.addWidget(self.create_btn)
         layout.addWidget(self.update_btn)
         layout.addWidget(self.delete_btn)
@@ -73,7 +87,9 @@ class QTableFormModel(ModelMixin, BaseWidget):
     def on_select(self):
         selection = self.table.get_selection()
         self.controllers.update_btn.setEnabled(len(selection) == 1)
-        self.controllers.delete_btn.setEnabled(len(selection) > 0)
+        if del_en := len(selection) > 0:
+            self.controllers.delete_btn.setToolTip(f'Borrar {self.model.__name__} ({len(selection)})')
+        self.controllers.delete_btn.setEnabled(del_en)
 
     def create_fn(self):
         uuid = f'{self.model.__name__}_create'

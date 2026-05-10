@@ -24,6 +24,7 @@ class QTableModel(ModelMixin, BaseWidget):
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
+        self.initial_resize = False
 
         self.row_instance = QRowInstance(self.table, self.fields)
         self.model.on_change(self.load_instances)
@@ -73,8 +74,6 @@ class QTableModel(ModelMixin, BaseWidget):
         for instance in instances:
             self.create_row(instance)
 
-        self.resize_columns()
-
     def get_selection(self):
         return self.table.selectionModel().selectedRows()
 
@@ -91,3 +90,9 @@ class QTableModel(ModelMixin, BaseWidget):
             row_item: QTableWidgetItem = self.table.item(row, 0)
             instance = row_item.data(Qt.ItemDataRole.UserRole)
             self.model.delete(instance)
+
+    def showEvent(self, event):
+        if not self.initial_resize:
+            self.resize_columns()
+            self.initial_resize = True
+        super().showEvent(event)
