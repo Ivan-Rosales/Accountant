@@ -122,11 +122,20 @@ class YearSummary(WorkbookExecution):
         sheet = self.get_sheet(name)
         if sheet is None: sheet = self.generate_sheet(month)
 
+        total_ingresos, total_egresos, total_iva = self.get_prev_data_from_sheet(sheet)
+        logger.debug(f'{self.__class__.__name__} got data from {name} ({total_ingresos}, {total_egresos}, {total_iva})')
+
+        return total_ingresos, total_egresos, total_iva
+
+    @staticmethod
+    def get_prev_data_from_sheet(sheet):
         total_ingresos = Decimal(sheet.cell(row=12, column=5).value or 0)
         total_egresos = Decimal(sheet.cell(row=19, column=5).value or 0)
-        total_iva = Decimal(sheet.cell(row=26, column=2).value or 0)
 
-        logger.debug(f'{self.__class__.__name__} got data from {name} ({total_ingresos}, {total_egresos}, {total_iva})')
+        total_iva = Decimal(0)
+        for row in range(1, sheet.max_row + 1):
+            if (sheet.cell(row=row, column=1).value or '').lower() == 'iva a cargo o favor':
+                total_iva = Decimal(sheet.cell(row=row, column=2).value or 0)
 
         return total_ingresos, total_egresos, total_iva
 
