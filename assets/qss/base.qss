@@ -2,7 +2,7 @@
     background-color: #212529;
     selection-color: #ffffff;
     selection-background-color: {{color}};
-    color: white;
+    color: {{text}};
 }
 
 *[class~="secondary"] {

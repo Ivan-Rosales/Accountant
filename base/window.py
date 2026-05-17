@@ -11,11 +11,12 @@ from app.settings import DEFAULT_THEME, QSS_PATH
 from logger import logger
 
 THEMES = {
-    'azul': ('#0d6efd', '#0b5ed7', '#0a58ca', '#0a53be'),
-    'verde': ('#20c997', '#1aa179', '#178f6b', '#136f54'),
-    'rojo': ('#F87575', '#FA8080', '#FF8E8E', '#FFA1A1'),
-    'morado': ('#6f42c1', '#5a32a3', '#4e2a91', '#41247a'),
-    'naranja': ('#fd7e14', '#e66f0e', '#cc610c', '#b4530a'),
+    'azul': ('#0d6efd', '#0b5ed7', '#0a58ca', '#0a53be', '#fff'),
+    'verde': ('#20c997', '#1aa179', '#178f6b', '#136f54', '#fff'),
+    'rojo': ('#F87575', '#FA8080', '#FF8E8E', '#FFA1A1', '#fff'),
+    'morado': ('#6f42c1', '#5a32a3', '#4e2a91', '#41247a', '#fff'),
+    'naranja': ('#fd7e14', '#e66f0e', '#cc610c', '#b4530a', '#fff'),
+    'gris': ('#6c757d', '#5c636a', '#4F575C', '#4c555d', '#fff'),
 }
 
 
@@ -61,7 +62,7 @@ class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
 
     def add_style_sheet(self, style_sheet, color):
         current_style_sheet = self.styleSheet()
-        labels = ('{{color}}', '{{hover}}', '{{border}}', '{{pressed}}')
+        labels = ('{{color}}', '{{hover}}', '{{border}}', '{{pressed}}', '{{text}}')
 
         for i, label in enumerate(labels):
             style_sheet = style_sheet.replace(label, color[i])

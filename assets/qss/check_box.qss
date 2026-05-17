@@ -30,5 +30,5 @@ QCheckBox::indicator:checked:hover {
 
 QCheckBox::indicator:checked::after {
     content: "✔";
-    color: white;
+    color: {{text}};
 }
