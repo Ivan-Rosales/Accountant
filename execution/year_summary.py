@@ -32,14 +32,14 @@ class YearSummary(WorkbookExecution):
         if not isinstance(self.client, Cliente):
             raise ValidationException('No se ha asignado un cliente')
 
-    def generate_sheet(self, month, force_new=False, prev=None):
+    def generate_sheet(self, month, replace=False, force_new=False, prev=None):
         name = month_name[month].capitalize()
         logger.info(f'{self.__class__.__name__} generating sheet {name} {month}')
 
         sheet = self.get_sheet(name)
         has_sheet = sheet is not None
 
-        if sheet is None or force_new:
+        if sheet is None or force_new or replace:
             sheet = self.workbook.create_sheet(name)
             sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
 
@@ -47,7 +47,7 @@ class YearSummary(WorkbookExecution):
                 self.generate_sheet_payment(month)
 
         self.set_labels(sheet, month)
-        self.set_data(sheet, month, prev)
+        self.set_data(sheet, month, prev, replace=replace)
         self.set_format(sheet)
 
         logger.info(f'{self.__class__.__name__} generated sheet {name} {month}')
@@ -115,12 +115,13 @@ class YearSummary(WorkbookExecution):
         sheet.cell(row=25, column=1).value = 'iva saldo anterior'.upper()
         sheet.cell(row=26, column=1).value = 'iva a cargo o favor'.upper()
 
-    def get_prev_data(self, month):
+    def get_prev_data(self, month, replace=False):
         month = month - 1
         if month == 0: return Decimal(0), Decimal(0), Decimal(0)
         name = month_name[month].capitalize()
         sheet = self.get_sheet(name)
-        if sheet is None: sheet = self.generate_sheet(month)
+
+        if sheet is None or replace: sheet = self.generate_sheet(month, force_new=True, replace=replace)
 
         total_ingresos, total_egresos, total_iva = self.get_prev_data_from_sheet(sheet)
         logger.debug(f'{self.__class__.__name__} got data from {name} ({total_ingresos}, {total_egresos}, {total_iva})')
@@ -143,11 +144,11 @@ class YearSummary(WorkbookExecution):
         rev = kind == 'ingresos'
         return MonthSummary(self.client, year=self.year, month=month, rev=rev)
 
-    def set_data(self, sheet, month, previous=None):
+    def set_data(self, sheet, month, previous=None, replace=False):
         if isinstance(previous, (list, tuple)) and len(previous) == 3:
             prev_ingresos, prev_egresos, prev_iva = previous
         else:
-            prev_ingresos, prev_egresos, prev_iva = self.get_prev_data(month)
+            prev_ingresos, prev_egresos, prev_iva = self.get_prev_data(month, replace=replace)
 
         # Ingresos
         ingresos_file = self.get_month_file(month, 'ingresos')

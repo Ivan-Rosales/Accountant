@@ -16,7 +16,7 @@ class YearSummaryWorker(QObject):
 
         try:
             year_summary = YearSummary(client, year)
-            sheet = year_summary.generate_sheet(month)
+            sheet = year_summary.generate_sheet(month, replace=True)
             year_summary.order_sheets()
 
             year_summary.set_active_sheet(sheet.title)
