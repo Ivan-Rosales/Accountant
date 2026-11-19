@@ -1,80 +1,122 @@
-from PySide6.QtWidgets import QMessageBox, QStyle, QLabel, QGridLayout, QHBoxLayout, QPushButton, QTextEdit
+"""Modal estándar de la aplicación: ícono, título, mensaje, detalles opcionales y botones a la derecha.
 
-from app.widgets.common import spacer
+Conserva la interfaz de QMessageBox que ya usa el código (setIcon, setText, setDetailedText,
+addButton, setDefaultButton, exec, clickedButton).
+"""
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QPainter, QColor, QFont
+from PySide6.QtWidgets import QMessageBox, QLabel, QGridLayout, QHBoxLayout, QPushButton, QTextEdit, QWidget, \
+    QVBoxLayout
+
 from base.dialog import BaseDialog
+
+KIND_INFO, KIND_WARNING, KIND_QUESTION, KIND_DANGER, KIND_SUCCESS = 'info', 'warning', 'question', 'danger', 'success'
+ICON_KINDS = {
+    QMessageBox.Icon.Information: KIND_INFO,
+    QMessageBox.Icon.Warning: KIND_WARNING,
+    QMessageBox.Icon.Question: KIND_QUESTION,
+    QMessageBox.Icon.Critical: KIND_DANGER,
+}
+KIND_STYLE = {  # color, símbolo
+    KIND_INFO: (None, 'i'),
+    KIND_QUESTION: (None, '?'),
+    KIND_WARNING: ('#d29922', '!'),
+    KIND_DANGER: ('#f85149', '!'),
+    KIND_SUCCESS: ('#3fb950', '✓'),
+}
+
+
+class QModalIcon(QWidget):
+    """Círculo de color con un símbolo; info y pregunta usan el color del tema."""
+
+    def __init__(self, parent=None, kind=KIND_INFO):
+        super().__init__(parent)
+        self.kind = kind
+        self.setFixedSize(40, 40)
+
+    def set_kind(self, kind):
+        self.kind = kind
+        self.update()
+
+    def paintEvent(self, _):
+        from app.widgets.switch import QSwitch
+        color, symbol = KIND_STYLE.get(self.kind, KIND_STYLE[KIND_INFO])
+        color = QColor(color or QSwitch.accent)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        background = QColor(color)
+        background.setAlpha(45)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(background)
+        painter.drawEllipse(QRectF(0, 0, 40, 40))
+
+        font = QFont(self.font())
+        font.setPointSize(14)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(color)
+        painter.drawText(QRectF(0, 0, 40, 40), Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.end()
 
 
 class QMessageDialog(BaseDialog):
     layout_class = QGridLayout
-    icon_map = {
-        QMessageBox.Icon.Warning: QStyle.StandardPixmap.SP_MessageBoxWarning,
-        QMessageBox.Icon.Question: QStyle.StandardPixmap.SP_MessageBoxQuestion,
-        QMessageBox.Icon.Information: QStyle.StandardPixmap.SP_MessageBoxInformation,
-    }
+    margin = (24, 48, 24, 20)
+    spacing = 14
+    windows_size = (480, 160)
 
-    windows_size = (600, 100)
-    _clickedButton = None
     details = 'mostrar detalles'
+    _clickedButton = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # El título va en el cuerpo del modal; la barra solo conserva el botón de cerrar
+        for name in ('titleLabel', 'iconLabel'):
+            if label := getattr(self.titleBar, name, None):
+                label.hide()
         self.default_buttons = []
+        self.primary_button = None
+        self.danger = False
 
     def create_ui(self):
-        self.text = QLabel()
-        self.icon_label = QLabel()
-        self.detailed_text = QTextEdit()
+        self.icon = QModalIcon(self)
+        self.heading = QLabel(self)
+        self.heading.setProperty('class', 'modal-title')
+        self.heading.setWordWrap(True)
+        self.text = QLabel(self)
+        self.text.setProperty('class', 'modal-text')
+        self.text.setWordWrap(True)
+        self.text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.detailed_text = QTextEdit(self)
         self.detailed_text.setReadOnly(True)
-
-        self.icon_label.hide()
+        self.detailed_text.setMinimumHeight(140)
         self.detailed_text.hide()
 
     def load_ui(self, layout: QGridLayout):
-        layout.setColumnStretch(0, 0)
         layout.setColumnStretch(1, 1)
-        layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 0)
-        layout.setRowStretch(2, 1)
-
-        layout.addWidget(self.text, 0, 1)
-        layout.addWidget(self.icon_label, 0, 0)
+        text_box = QVBoxLayout()
+        text_box.setSpacing(6)
+        text_box.addWidget(self.heading)
+        text_box.addWidget(self.text)
+        layout.addWidget(self.icon, 0, 0, Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(text_box, 0, 1)
         layout.addWidget(self.detailed_text, 2, 0, 1, 2)
 
-    def create_buttons(self):
-        self.buttons = QHBoxLayout()
-        self.buttons.addItem(spacer)
-
-        diff = [i for i in self.default_buttons if i != self.details]
-        if len(diff) == 0: self.insertButton('ok')
-
-        for label in self.default_buttons:
-            button = QPushButton(label.capitalize())
-            button.clicked.connect(lambda widget=button, name=label, *args, **kwargs: self.on_click(widget, name))
-            button.setMinimumWidth(50)
-
-            self.buttons.addWidget(button)
-
-            normalize_name = label.replace(' ', '_')
-            setattr(self, f'btn_{normalize_name}', button)
-
-        self._layout.addLayout(self.buttons, 1, 0, 1, 2)
+    # ---- API tipo QMessageBox -------------------------------------------------
+    def setWindowTitle(self, title):
+        super().setWindowTitle(title)
+        self.heading.setText(str(title))
 
     def setIcon(self, icon_enum):
-        icon = self.icon_map.get(icon_enum)
-        if icon is None: return
-
-        style = self.style()
-        pixmap = style.standardIcon(icon).pixmap(48, 48)
-        self.icon_label.setPixmap(pixmap)
-        self.icon_label.show()
+        self.icon.set_kind(ICON_KINDS.get(icon_enum, icon_enum if isinstance(icon_enum, str) else KIND_INFO))
 
     def setText(self, text):
         self.text.setText(text)
-        self.text.show()
 
     def setDetailedText(self, text):
         if self.details not in self.default_buttons:
-            self.addButton(self.details, None)
+            self.default_buttons.insert(0, self.details)
         self.detailed_text.setText(text)
 
     def addButton(self, text, _=None):
@@ -85,22 +127,55 @@ class QMessageDialog(BaseDialog):
         self.default_buttons.insert(index, text)
         return text
 
-    def setDefaultButton(self, *_, **__):
-        pass
+    def setDefaultButton(self, button, *_):
+        self.primary_button = button
+
+    def setDanger(self, danger=True):
+        self.danger = danger
+        self.icon.set_kind(KIND_DANGER if danger else self.icon.kind)
+
+    # ---- construcción -----------------------------------------------------------
+    def create_buttons(self):
+        actions = [b for b in self.default_buttons if b != self.details]
+        if not actions:
+            self.default_buttons.append('aceptar')
+            actions = ['aceptar']
+        primary = self.primary_button if self.primary_button in actions else actions[-1]
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        if self.details in self.default_buttons:
+            row.addWidget(self._button(self.details, flat=True))
+        row.addStretch(1)
+        # el botón principal siempre a la derecha
+        for label in [a for a in actions if a != primary] + [primary]:
+            button = self._button(label, primary=label == primary)
+            row.addWidget(button)
+            if label == primary:
+                button.setDefault(True)
+                button.setFocus()
+        self._layout.addLayout(row, 3, 0, 1, 2)
+
+    def _button(self, label, primary=False, flat=False):
+        button = QPushButton(label[:1].upper() + label[1:], self)
+        button.setMinimumWidth(96)
+        if primary:
+            button.setProperty('class', 'danger' if self.danger else 'primary')
+        if flat:
+            button.setProperty('type', 'flat')
+        button.clicked.connect(lambda *_, w=button, name=label: self.on_click(w, name))
+        setattr(self, f'btn_{label.replace(" ", "_")}', button)
+        return button
 
     def on_click(self, widget, name):
         if name == self.details:
-            is_visible = not self.detailed_text.isVisible()
-            self.detailed_text.setVisible(is_visible)
+            visible = not self.detailed_text.isVisible()
+            self.detailed_text.setVisible(visible)
+            widget.setText('Ocultar detalles' if visible else 'Mostrar detalles')
             self.adjustSize()
-
-            message = 'ocultar detalles'.capitalize() if is_visible else self.details.capitalize()
-            widget.setText(message)
             return
-
-        self.hide()
-
         self._clickedButton = name
+        self.hide()
 
     def clickedButton(self):
         return self._clickedButton
@@ -111,4 +186,5 @@ class QMessageDialog(BaseDialog):
 
     def exec(self):
         self.create_buttons()
-        super().exec()
+        self.adjustSize()
+        return super().exec()

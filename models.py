@@ -24,8 +24,9 @@ class Cliente(DatabaseWorker.base, ModelMixin):
     nombre = Column(String(100))
     apellido_paterno = Column(String(100), comment='apellido paterno')
     apellido_materno = Column(String(100), comment='apellido materno')
-    rfc = Column(String(100), unique=True)
+    rfc = Column(String(100), unique=True, comment='RFC')
     __tablename__ = "client"
+    verbose_name = 'cliente'
 
     def fullname(self):
         return f'{self.nombre} {self.apellido_paterno} {self.apellido_materno}'

@@ -185,3 +185,27 @@ QPushButton[scope~="table"][corner~="bottom-right"],
 QPushButton[class~="primary"][scope~="table"][corner~="bottom-right"] {
     border-bottom-right-radius: 10px;
 }
+
+/* Modales */
+
+#QMessageDialog, #QConfirmMessageBox, #BaseDialog {
+    background-color: #1e2227;
+    border: 1px solid #30363d;
+}
+
+StandardTitleBar, StandardTitleBar > QLabel {
+    background-color: transparent;
+}
+
+#QMessageDialog QFrame, #BaseDialog QFrame {
+    background-color: transparent;
+}
+
+QLabel[class~="modal-title"] {
+    font-size: 12pt;
+    font-weight: 600;
+}
+
+QLabel[class~="modal-text"] {
+    color: #c9d1d9;
+}

@@ -66,3 +66,20 @@ QPushButton[class~="primary"]:disabled {
     border: 1px solid {{color}};
     color: {{text}};
 }
+
+/* Botón de acción destructiva */
+
+QPushButton[class~="danger"] {
+    background-color: #da3633;
+    border: 1px solid #da3633;
+    color: #ffffff;
+}
+
+QPushButton[class~="danger"]:hover {
+    background-color: #e5534b;
+    border: 1px solid #e5534b;
+}
+
+QPushButton[class~="danger"]:pressed {
+    background-color: #b62324;
+}
