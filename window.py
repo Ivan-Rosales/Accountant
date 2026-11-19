@@ -5,7 +5,9 @@ from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 from app import settings as app_settings
 from app.core.settings import settings
 from app.views.client_admin import QClientAdmin
+from app.views.cfdi_admin import QCfdiAdmin
 from app.views.configuration import QConfiguration
+from app.views.diot import QDiot
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
 from app.widgets.common import spacer, QButton
@@ -26,6 +28,8 @@ class MainWindow(BaseWindow):
     tabs = {
         'text-file': QMonthSummary,
         'bar-char': QYearSummary,
+        'report': QCfdiAdmin,
+        'report-3': QDiot,
         'user': QClientAdmin,
         'gear': QConfiguration,
     }
@@ -37,7 +41,7 @@ class MainWindow(BaseWindow):
         self.active_tab = None
         super().__init__(*args, **kwargs)
 
-        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'gear')
+        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'text-file')
 
     def create_ui(self):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})

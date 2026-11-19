@@ -155,10 +155,14 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
     def set_default(self, button):
         self.setPropertyUpddate(button, 'class', '')
         button.setEnabled(False)
+        kind = 'ingresos' if str(button.property('file')).endswith('INGRESOS.xlsx') else 'egresos'
+        button.setToolTip(f'Sin concentrado de {kind} de {month_name[button.property("month")]}. '
+                          f'Genérelo en la pestaña mensual.')
 
     def set_found(self, button):
         self.setPropertyUpddate(button, 'class', 'primary')
         button.setEnabled(True)
+        button.setToolTip(f'Abrir {month_name[button.property("month")]}')
 
     def btn_click(self, button):
         client = self.client_selector.get_current()
