@@ -1,3 +1,4 @@
+from exceptions import ValidationException
 from PySide6.QtWidgets import QVBoxLayout, QCheckBox
 
 from app.core.settings import settings
@@ -43,7 +44,11 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()
+        if client is None:
+            raise ValidationException('Seleccione un cliente')
         paths = self.selector.get_files()
+        if not paths:
+            raise ValidationException('Seleccione al menos un archivo ZIP')
 
         params = {
             'create_providers': self.prov_check.isChecked(),

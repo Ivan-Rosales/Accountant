@@ -86,7 +86,6 @@ class MonthSummaryProviders(MonthSummary):
             for person, xml_files in providers.items():
                 row = RowProviders(person, xml_files)
                 writer.writerow(row.csv_row())
-                writer.writerow(row.csv_row())
         finally:
             file.close()
 

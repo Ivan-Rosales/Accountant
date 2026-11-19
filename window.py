@@ -87,6 +87,7 @@ class MainWindow(BaseWindow):
         conf = self.get_widget_tab('gear')
         conf.register_change('dbdir', database_worker.reset)
         conf.register_change('theme', self.load_qss)
+        conf.register_change('workdir', self.get_widget_tab('bar-char').set_workdir)
         self.load_qss(conf.get_conf_value('theme'))
         self.header.setFocus()
 

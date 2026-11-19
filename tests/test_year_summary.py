@@ -69,7 +69,6 @@ def test_saldo_a_favor_se_acumula(cliente, xml_dir):
     assert iva_block(wb[febrero]) == [16, 32, -16, -32, -48]
 
 
-@pytest.mark.xfail(strict=True, reason='Fase 2: regenerar con replace=True crea hojas duplicadas ("Enero1")')
 def test_regenerar_no_duplica_hojas(cliente, xml_dir):
     month_file(cliente, xml_dir, 1, ingresos=[100], egresos=[50])
     for _ in range(2):
@@ -77,3 +76,21 @@ def test_regenerar_no_duplica_hojas(cliente, xml_dir):
         summary.generate_sheet(1, replace=True)
         summary.save()
     assert load_workbook(summary.filename).sheetnames == [month_name[1].capitalize()]
+
+
+def test_regenerar_abril_no_duplica_hojas_ni_pago(cliente, xml_dir):
+    for month in range(1, 5):
+        month_file(cliente, xml_dir, month, ingresos=[100 * month], egresos=[50])
+    for _ in range(2):
+        summary = YearSummary(cliente, YEAR)
+        summary.generate_sheet(4, replace=True)
+        summary.save()
+
+    names = [month_name[m].capitalize() for m in range(1, 5)]
+    wb = load_workbook(summary.filename)
+    assert sorted(wb.sheetnames) == sorted(names + [f'{names[3]} pago'])
+
+    # La hoja de pago acumula los ingresos de marzo (300) con los de abril (400)
+    pago = wb[f'{names[3]} pago']
+    assert pago.cell(6, 2).value == 400
+    assert pago.cell(11, 5).value == 300

@@ -37,21 +37,34 @@ class YearSummary(WorkbookExecution):
         logger.info(f'{self.__class__.__name__} generating sheet {name} {month}')
 
         sheet = self.get_sheet(name)
-        has_sheet = sheet is not None
+        is_new = sheet is None or force_new or replace
 
-        if sheet is None or force_new or replace:
-            sheet = self.workbook.create_sheet(name)
+        if is_new:
+            index = None
+            if sheet is not None and replace and not force_new:
+                # Reemplazar en la misma posición en lugar de crear "Enero1"
+                index = self.workbook.index(sheet)
+                self.workbook.remove(sheet)
+            sheet = self.workbook.create_sheet(name, index)
             sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
-
-            if not has_sheet and 2 < month and month % 2 == 0:
-                self.generate_sheet_payment(month)
 
         self.set_labels(sheet, month)
         self.set_data(sheet, month, prev, replace=replace)
         self.set_format(sheet)
 
+        # La hoja de pago se arma después, cuando el mes anterior ya está actualizado
+        if is_new and not force_new and 2 < month and month % 2 == 0:
+            if replace and (payment := self.get_sheet(self.payment_sheet_name(month))) is not None:
+                self.workbook.remove(payment)
+            if self.get_sheet(self.payment_sheet_name(month)) is None:
+                self.generate_sheet_payment(month)
+
         logger.info(f'{self.__class__.__name__} generated sheet {name} {month}')
         return sheet
+
+    @staticmethod
+    def payment_sheet_name(month):
+        return f'{month_name[month].capitalize()} pago'
 
     def generate_sheet_payment(self, month):
         name = month_name[month].capitalize()
@@ -66,7 +79,7 @@ class YearSummary(WorkbookExecution):
         total_iva = Decimal(prev_sheet.cell(row=24, column=2).value)
 
         sheet = self.generate_sheet(month, force_new=True, prev=(total_ingresos, total_egresos, total_iva))
-        sheet.title = f'{name} pago'
+        sheet.title = self.payment_sheet_name(month)
 
         sheet.cell(row=11, column=1).value = f'total de ingresos de {prev_name}'.upper()
         sheet.cell(row=18, column=1).value = f'total de egresos de {prev_name}'.upper()
@@ -121,7 +134,7 @@ class YearSummary(WorkbookExecution):
         name = month_name[month].capitalize()
         sheet = self.get_sheet(name)
 
-        if sheet is None or replace: sheet = self.generate_sheet(month, force_new=True, replace=replace)
+        if sheet is None or replace: sheet = self.generate_sheet(month, replace=replace)
 
         total_ingresos, total_egresos, total_iva = self.get_prev_data_from_sheet(sheet)
         logger.debug(f'{self.__class__.__name__} got data from {name} ({total_ingresos}, {total_egresos}, {total_iva})')

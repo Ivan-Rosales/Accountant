@@ -187,6 +187,7 @@ class ImportFilesWorker(QObject):
 
     def on_start(self, path, clients):
         try:
+            self.files = []  # por instancia y por corrida: antes era una lista de clase que se acumulaba
             self.clients = clients
             self.search_files(path)
             summary = self.generate_new_files()

@@ -47,6 +47,11 @@ class ModelMixin:
     def save(self, *args, **kwargs):
         database_worker.execute.emit(lambda: database_worker.save(self, *args, **kwargs))
 
+    @classmethod
+    def increment(cls, field, amount, **filters):
+        """Suma `amount` a `field` en el hilo de la BD (sin mutar objetos ORM desde la UI)."""
+        database_worker.execute.emit(lambda: database_worker.increment(cls, field, amount, **filters))
+
 
 class DatabaseWorker(QObject):
     execute = Signal(object)
@@ -85,7 +90,26 @@ class DatabaseWorker(QObject):
         return self._session
 
     def on_execute(self, func):
-        if callable(func): func()
+        if not callable(func): return
+        try:
+            func()
+        except Exception as error:
+            # Sin rollback la sesión queda inutilizable después de un commit fallido
+            logger.error(f'Database operation failed: {error}')
+            if self._session is not None:
+                self._session.rollback()
+
+    def increment(self, model, field, amount, **filters):
+        logger.debug(f'Incrementing {model.__name__}.{field} by {amount} {filters}')
+
+        instance = self.session.execute(select(model).filter_by(**filters)).scalar_one_or_none()
+        if instance is None:
+            instance = model(**filters)
+            setattr(instance, field, 0)
+            self.session.add(instance)
+        setattr(instance, field, (getattr(instance, field) or 0) + amount)
+        self.session.commit()
+        self.get_all(model)
 
     def get_all(self, model):
         logger.debug(f'Getting {model.__name__}')

@@ -1,8 +1,12 @@
+from exceptions import ValidationException
 from calendar import month_abbr, month_name
 from datetime import datetime
 from functools import cached_property
+from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QGridLayout, QComboBox, QWidget
+from openpyxl import load_workbook
 
 from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
@@ -21,7 +25,8 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
     layout_class = QGridLayout
     tooltip_label = 'concentrado anual'
 
-    worker_class = [YearSummaryWorker, WatchdogWorker(settings.get_workdir())]
+    worker_class = YearSummaryWorker
+    RELOAD_DELAY_MS = 700
 
     @cached_property
     def client_selector(self):
@@ -31,9 +36,21 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
         self.workdir = settings.get_workdir()
         super().__init__(*args, **kwargs)
 
-        if hasattr(self, 'worker_1'):
-            self.worker_1.change.connect(self.reload_data)
-            self.worker_1.start.emit()
+        # Varios eventos seguidos del sistema de archivos (p. ej. al guardar un libro) se agrupan en una recarga
+        self.reload_timer = QTimer(self)
+        self.reload_timer.setSingleShot(True)
+        self.reload_timer.setInterval(self.RELOAD_DELAY_MS)
+        self.reload_timer.timeout.connect(lambda: self.load_data(self.client_selector.get_current()))
+
+        self.watchdog = WatchdogWorker(self.workdir)
+        self.watchdog.change.connect(self.reload_data)
+        self.watchdog.on_start()
+        self.destroyed.connect(self.watchdog.stop)
+
+    def set_workdir(self, path):
+        self.workdir = settings.get_workdir() if path is None else Path(str(path))
+        self.watchdog.set_path(self.workdir)
+        self.reload_data()
 
     def create_ui(self):
         self.buttons = QGridLayout()
@@ -97,8 +114,18 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
 
         layout.addWidget(self.execute_btn, 4, 0, 1, 12)
 
-    def reload_data(self, _):
-        self.load_data(self.client_selector.get_current())
+    def reload_data(self, *_):
+        timer = getattr(self, 'reload_timer', None)  # puede llamarse desde create_ui, antes de crear el timer
+        if timer is not None: timer.start()
+
+    @staticmethod
+    def get_sheetnames(file: Path) -> list:
+        # Modo solo lectura: abre únicamente el índice de hojas, no carga las celdas
+        workbook = load_workbook(file, read_only=True)
+        try:
+            return list(workbook.sheetnames)
+        finally:
+            workbook.close()
 
     def load_data(self, client):
         if client is None: return
@@ -111,22 +138,19 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
             file = files_path / f'{client.rfc} {current_year} {kind.upper()}.xlsx'
 
             try:
-                summary = MonthSummary(client)
-                if file.exists(): summary.from_file(file)
-
-                for month in range(1, 13):
-                    button: QButton | QWidget = self.buttons.itemAtPosition(row, month).widget()
-                    button.setProperty('summary', summary)
-                    button.setProperty('month', month)
-                    self.set_default(button)
-
-                    sheet_name = month_name[month].capitalize()
-                    if summary.get_sheet(sheet_name):
-                        logger.debug(f'{self.__class__.__name__} has sheet {kind} {sheet_name}')
-                        self.set_found(button)
+                sheetnames = self.get_sheetnames(file) if file.exists() else []
             except Exception as error:
                 logger.error(f'{self.__class__.__name__} cannot load data {error}')
-                continue
+                sheetnames = []
+
+            for month in range(1, 13):
+                button: QButton | QWidget = self.buttons.itemAtPosition(row, month).widget()
+                button.setProperty('file', str(file))
+                button.setProperty('month', month)
+                self.set_default(button)
+
+                if month_name[month].capitalize() in sheetnames:
+                    self.set_found(button)
 
     def set_default(self, button):
         self.setPropertyUpddate(button, 'class', '')
@@ -137,8 +161,11 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
         button.setEnabled(True)
 
     def btn_click(self, button):
-        summary = button.property('summary')
+        client = self.client_selector.get_current()
+        if client is None: return
         month = button.property('month')
+        summary = MonthSummary(client)
+        summary.from_file(Path(button.property('file')))
 
         logger.debug(f'{self.__class__.__name__} opening summary {summary} {month}')
 
@@ -149,6 +176,8 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()
+        if client is None:
+            raise ValidationException('Seleccione un cliente')
         year = int(self.years.currentText())
         month = int(self.months.currentIndex() + 1)
         return client, year, month

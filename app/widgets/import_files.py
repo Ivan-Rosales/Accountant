@@ -30,10 +30,10 @@ class QImportWidget(AsyncExecutionMixin, BaseWidget):
         self.clients = {i.rfc: i for i in clients}
 
     def select_path(self):
-        self.files = []
+        self.base_path = None
 
-        path_str = QFileDialog.getExistingDirectory()
-        if path_str is None: return
+        path_str = QFileDialog.getExistingDirectory(self, 'Seleccione la carpeta con los archivos a importar')
+        if not path_str: return  # cancelado: Path('') sería la carpeta actual
         path = Path(path_str)
         if not path.is_dir(): return
 
@@ -41,7 +41,7 @@ class QImportWidget(AsyncExecutionMixin, BaseWidget):
         self.start_worker()
 
     def validate_data(self):
-        if self.base_path is None:
+        if getattr(self, 'base_path', None) is None:
             raise ValidationException('Base path not set')
 
         return self.base_path, self.clients

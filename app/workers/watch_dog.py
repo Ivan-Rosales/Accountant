@@ -1,4 +1,3 @@
-import time
 from pathlib import Path
 
 from PySide6.QtCore import Signal, QObject
@@ -8,54 +7,54 @@ from watchdog.observers import Observer
 from logger import logger
 
 
+def is_relevant(path: str) -> bool:
+    """Solo interesan los libros de Excel; se ignoran los archivos de bloqueo de Office (~$...)."""
+    p = Path(path)
+    return p.suffix.lower() == '.xlsx' and not p.name.startswith('~$')
+
+
 class WatchdogHandler(FileSystemEventHandler):
     def __init__(self, worker):
         super().__init__()
         self.worker = worker
 
-    def on_created(self, event):
-        if not event.is_directory:
-            self.worker.change.emit(event.src_path)
-
-    def on_modified(self, event):
-        if not event.is_directory:
-            self.worker.change.emit(event.src_path)
-
-    def on_deleted(self, event):
-        if not event.is_directory:
-            self.worker.change.emit(event.src_path)
+    def on_any_event(self, event):
+        if event.is_directory or event.event_type not in ('created', 'modified', 'deleted', 'moved'):
+            return
+        for path in (event.src_path, getattr(event, 'dest_path', '')):
+            if path and is_relevant(str(path)):
+                # Se emite desde el hilo del observer; Qt lo entrega en cola al hilo de la UI
+                self.worker.change.emit(str(path))
+                return
 
 
-class WatchdogWorkerBase(QObject):
+class WatchdogWorker(QObject):
+    """Vigila una carpeta. El Observer de watchdog ya corre en su propio hilo, así que no bloquea ninguno de Qt."""
     start = Signal()
     change = Signal(str)
-    path = None
 
-    def __init__(self):
+    def __init__(self, path=None):
         super().__init__()
-        self.observer = Observer()
-        self._running = True
+        self.path: Path | None = Path(path) if path else None
+        self.observer: Observer | None = None
 
     def on_start(self):
-        handler = WatchdogHandler(self)
+        self.stop()
+        if self.path is None: return
 
-        if isinstance(self.path, Path):
-            self.path.mkdir(parents=True, exist_ok=True)
-
-        logger.info(f'Watching {self.path} on change')
-        self.observer.schedule(handler, self.path, recursive=True)
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.observer = Observer()
+        self.observer.schedule(WatchdogHandler(self), str(self.path), recursive=True)
+        self.observer.daemon = True
         self.observer.start()
+        logger.info(f'Watching {self.path} on change')
 
-        try:
-            while self._running:
-                time.sleep(1)
-        finally:
-            self.observer.stop()
-            self.observer.join()
+    def set_path(self, path):
+        self.path = Path(path)
+        self.on_start()
 
     def stop(self):
-        self._running = False
-
-
-def WatchdogWorker(path):
-    return type('WatchdogWorkerPath', (WatchdogWorkerBase,), {'path': path})
+        if self.observer is not None:
+            self.observer.stop()
+            self.observer.join(timeout=5)
+            self.observer = None
