@@ -44,6 +44,10 @@ class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
         self.setStyleSheet('')
 
         primary = color[0]
+        from app.widgets.switch import QSwitch
+        QSwitch.accent = primary
+        for switch in self.findChildren(QSwitch):
+            switch.update()
         self.setWindowIcon(self.svg_to_icon(self.icon_path, color=primary))
 
         logger.info(f'Set application theme {self.theme}')

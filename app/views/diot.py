@@ -2,12 +2,14 @@
 import os
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem, QLabel,
                                QHeaderView, QMessageBox)
 
 from app.core.settings import settings
 from app.widgets.common import QButton
 from app.widgets.confirm_box import QConfirmMessageBox
+from app.widgets.switch import QClickComboBox
 from app.widgets.period_selector import QPeriodSelector, show_message
 from app.workers.database import database_worker
 from base.tab import TabWidget
@@ -155,7 +157,7 @@ class QDiot(TabWidget):
         self.table.setItem(row, COL[column], item)
 
     def set_combo(self, row, column, options: dict, current, attr, enabled=True):
-        combo = QComboBox(self.table)
+        combo = QClickComboBox(self.table)
         for key, label in options.items():
             combo.addItem(label, key)
         combo.setCurrentIndex(max(0, combo.findData(current)))
@@ -180,14 +182,13 @@ class QDiot(TabWidget):
 
     def update_status(self, row):
         provider = self.providers[row]
-        errors = diot.validate(provider, self.period.year)
-        warnings = provider.warnings
+        issues = diot.check(provider, self.period.year)
+        has_error = any(i.level == diot.ERROR for i in issues)
         was_loading, self._loading = self._loading, True
-        item = QTableWidgetItem('Revisar' if errors else ('Aviso' if warnings else 'OK'))
+        item = QTableWidgetItem('Error' if has_error else ('Advertencia' if issues else 'OK'))
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        item.setToolTip('\n'.join(errors + warnings) if errors or warnings else 'Sin errores')
-        item.setForeground(Qt.GlobalColor.red if errors else
-                           (Qt.GlobalColor.darkYellow if warnings else Qt.GlobalColor.darkGreen))
+        item.setToolTip('\n'.join(f'{i.level.capitalize()}: {i.message}' for i in issues) or 'Sin observaciones')
+        item.setForeground(QColor('#f85149') if has_error else QColor('#d29922') if issues else QColor('#3fb950'))
         self.table.setItem(row, COL['Estado'], item)
         self._loading = was_loading
 
@@ -211,15 +212,25 @@ class QDiot(TabWidget):
                          icon=QMessageBox.Icon.Warning, title='DIOT')
             return
 
+        issues = diot.summarize(self.providers, self.period.year)
+        if issues:
+            errors = sum(any(i.level == diot.ERROR for i in v) for v in issues.values())
+            warnings = len(issues) - errors
+            lines = [f'{rfc}: ' + '; '.join(i.message for i in v) for rfc, v in list(issues.items())[:8]]
+            if len(issues) > 8: lines.append(f'... y {len(issues) - 8} proveedores más')
+            confirmed = []
+            QConfirmMessageBox(self, f'{warnings} proveedor(es) con advertencias y {errors} con errores.\n'
+                                     'El SAT podría rechazar esas líneas.\n\n' + '\n'.join(lines) +
+                               '\n\n¿Generar el TXT de todos modos?',
+                               lambda: confirmed.append(True), title='DIOT con observaciones',
+                               icon=QMessageBox.Icon.Warning)
+            if not confirmed: return
+
         path = diot.default_filename(settings.get_workdir(), client.rfc, self.period.year, self.period.month)
-        try:
-            diot.export(path, self.providers, self.period.year, self.efectos_fiscales)
-        except ValueError as error:
-            text, _, detail = str(error).partition('\n')
-            show_message(self, text, detail, icon=QMessageBox.Icon.Warning, title='DIOT con errores')
-            return
+        diot.export(path, self.providers, self.period.year, self.efectos_fiscales)
 
         self.save_settings(quiet=True)
         layout = '2025 en adelante' if self.period.year >= 2025 else '2024 y anteriores'
-        QConfirmMessageBox(self, f'Se generó la DIOT ({layout}, {len(self.providers)} proveedores):\n{path}\n'
+        note = f'\nCon observaciones en {len(issues)} proveedor(es).' if issues else ''
+        QConfirmMessageBox(self, f'Se generó la DIOT ({layout}, {len(self.providers)} proveedores):\n{path}{note}\n'
                                  f'¿Desea abrir la carpeta?', lambda: os.startfile(path.parent), title='DIOT')

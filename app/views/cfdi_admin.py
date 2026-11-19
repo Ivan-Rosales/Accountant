@@ -4,11 +4,12 @@ from decimal import Decimal
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem, QLabel,
-                               QAbstractItemView, QHeaderView, QMessageBox)
+                               QAbstractItemView, QHeaderView, QMessageBox, QWidget)
 
 from app.core.settings import settings
 from app.widgets.common import QButton
 from app.widgets.period_selector import QPeriodSelector, show_message
+from app.widgets.switch import QSwitch, QClickComboBox
 from app.workers.database import database_worker
 from base.tab import TabWidget
 from execution import cfdi_store
@@ -35,7 +36,7 @@ class QCfdiAdmin(TabWidget):
 
     def create_ui(self):
         self.period = QPeriodSelector(self)
-        self.kind = QComboBox(self)
+        self.kind = QClickComboBox(self)
         self.kind.addItem('Egresos', False)
         self.kind.addItem('Ingresos', True)
 
@@ -49,7 +50,6 @@ class QCfdiAdmin(TabWidget):
         self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        self.table.itemChanged.connect(self.on_item_changed)
 
         self.summary = QLabel(self)
         self.summary.setProperty('class', 'secondary')
@@ -115,11 +115,16 @@ class QCfdiAdmin(TabWidget):
         row = self.table.rowCount()
         self.table.insertRow(row)
 
-        check = QTableWidgetItem()
-        check.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-        check.setCheckState(Qt.CheckState.Checked if record.cancelado else Qt.CheckState.Unchecked)
-        check.setData(Qt.ItemDataRole.UserRole, record.uuid)
-        self.table.setItem(row, 0, check)
+        cell = QWidget(self.table)
+        cell.setStyleSheet("background: transparent;")
+        cell_layout = QHBoxLayout(cell)
+        cell_layout.setContentsMargins(0, 0, 0, 0)
+        cell_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        switch = QSwitch(cell, checked=bool(record.cancelado))
+        switch.setToolTip('Marcar como cancelado (se excluye del concentrado y de la DIOT)')
+        switch.toggled.connect(lambda checked, uuid=record.uuid: self.on_cancel_toggled(uuid, checked))
+        cell_layout.addWidget(switch)
+        self.table.setCellWidget(row, 0, cell)
 
         counterpart = record.receptor if (ingreso or record.tipo == 'N') else record.emisor
         name = PUBLICO_EN_GENERAL if counterpart.rfc in GENERIC_RFCS else counterpart.name
@@ -132,11 +137,9 @@ class QCfdiAdmin(TabWidget):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(row, column, item)
 
-    def on_item_changed(self, item: QTableWidgetItem):
-        if self._loading or item.column() != 0: return
+    def on_cancel_toggled(self, uuid, cancelled):
+        if self._loading: return
         client = self.client_selector.get_current()
-        cancelled = item.checkState() == Qt.CheckState.Checked
-        uuid = item.data(Qt.ItemDataRole.UserRole)
         with database_worker.new_session() as session:
             cfdi_store.set_cancelled(session, client, uuid, cancelled)
         logger.info(f'CFDI {uuid} cancelado={cancelled}')

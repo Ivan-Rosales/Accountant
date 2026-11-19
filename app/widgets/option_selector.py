@@ -1,8 +1,8 @@
 from functools import cached_property
 
-from PySide6.QtWidgets import QComboBox
 
 from app.mixin.property_update import PropertyMixin
+from app.widgets.switch import QClickComboBox
 from base.widget import BaseWidget
 
 
@@ -16,7 +16,7 @@ class QOptionSelector(PropertyMixin, BaseWidget):
         super().__init__(*args, **kwargs)
 
     def create_ui(self):
-        self.combo = QComboBox(self)
+        self.combo = QClickComboBox(self)
         for value, label in self.options.items():
             self.combo.addItem(label, value)
 

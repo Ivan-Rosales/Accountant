@@ -40,6 +40,7 @@ RFC_EXTRANJERO = 'XEXX010101000'
 RFC_PATTERN = re.compile(r'^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$')
 TEXT_PATTERN = re.compile(r'^[A-Za-z0-9 @´%#¡!.,$&¿?ñÑ/\-_Ü]*$')
 
+CRLF = chr(13) + chr(10)
 FIELDS_2025 = 54
 FIELDS_2024 = 23
 
@@ -236,58 +237,88 @@ def line_2024(p: DiotProvider, year: int) -> list[str]:
     return row
 
 
-def validate(p: DiotProvider, year: int) -> list[str]:
-    """Reglas del instructivo que causan rechazo. Devuelve los errores encontrados."""
-    errors = []
+ERROR, ADVERTENCIA = 'error', 'advertencia'
+
+
+@dataclass
+class Issue:
+    """Observación de un proveedor. Ninguna bloquea la exportación.
+
+    - advertencia: regla del instructivo que el SAT podría rechazar (datos faltantes, montos, claves).
+    - error: dato que el programa no reconoce (clave de tercero u operación desconocida, etc.).
+    """
+    level: str
+    message: str
+
+    def __str__(self):
+        return self.message
+
+
+def check(p: DiotProvider, year: int) -> list[Issue]:
+    issues = []
+
+    def warn(message): issues.append(Issue(ADVERTENCIA, message))
+
+    def error(message): issues.append(Issue(ERROR, message))
+
     operaciones = (OPERACIONES_2025 if year >= 2025 else OPERACIONES_2024).get(p.tipo_tercero)
-    if operaciones is None:
-        errors.append(f'Tipo de tercero inválido: {p.tipo_tercero}')
-    elif p.tipo_operacion not in operaciones:
-        errors.append(f'El tipo de operación {p.tipo_operacion} no aplica a un tercero '
-                      f'{TIPOS_TERCERO[p.tipo_tercero].lower()} en {year}')
+    if p.tipo_tercero not in TIPOS_TERCERO:
+        error(f'Tipo de tercero no reconocido: {p.tipo_tercero!r}')
+    if p.tipo_operacion not in TIPOS_OPERACION:
+        error(f'Tipo de operación no reconocido: {p.tipo_operacion!r}')
+    elif operaciones is not None and p.tipo_operacion not in operaciones:
+        warn(f'El tipo de operación {p.tipo_operacion} no aplica a un tercero '
+             f'{TIPOS_TERCERO[p.tipo_tercero].lower()} en {year}')
+    if p.frontera not in (FRONTERA_NORTE, FRONTERA_SUR):
+        error(f'Región fronteriza no reconocida: {p.frontera!r}')
 
     if p.tipo_tercero == NACIONAL:
         if not RFC_PATTERN.match(p.rfc) or p.rfc in (RFC_GLOBAL, RFC_EXTRANJERO):
-            errors.append(f'RFC inválido para tercero nacional: {p.rfc}')
+            warn(f'RFC inválido para tercero nacional: {p.rfc}')
     elif p.tipo_tercero == EXTRANJERO:
-        if not p.tax_id: errors.append('Falta el número de identificación fiscal del extranjero')
-        if not p.nombre_extranjero: errors.append('Falta el nombre del extranjero')
-        if not re.fullmatch(r'[A-Z]{3}', p.pais.upper()): errors.append('Falta el país (clave de 3 letras)')
-        if p.pais.upper() == 'ZZZ' and not p.jurisdiccion: errors.append('País ZZZ requiere lugar de jurisdicción')
+        if not p.tax_id: warn('Falta el número de identificación fiscal del extranjero')
+        if not p.nombre_extranjero: warn('Falta el nombre del extranjero')
+        if not re.fullmatch(r'[A-Z]{3}', p.pais.upper()): warn('Falta el país (clave de 3 letras)')
+        if p.pais.upper() == 'ZZZ' and not p.jurisdiccion: warn('País ZZZ requiere lugar de jurisdicción')
         for text in (p.tax_id, p.nombre_extranjero, p.jurisdiccion):
-            if text and not TEXT_PATTERN.match(text): errors.append(f'Caracteres no permitidos: {text}')
-        if len(p.tax_id) > 40: errors.append('Identificación fiscal mayor a 40 caracteres')
+            if text and not TEXT_PATTERN.match(text): warn(f'Caracteres no permitidos por el SAT: {text}')
+        if len(p.tax_id) > 40: warn('Identificación fiscal mayor a 40 caracteres')
 
-    if p.dev16 > p.base16: errors.append('Las devoluciones al 16 % exceden el valor de los actos')
-    if p.dev8 > p.base8: errors.append('Las devoluciones en región fronteriza exceden el valor de los actos')
+    if p.dev16 > p.base16: warn('Las devoluciones al 16 % exceden el valor de los actos')
+    if p.dev8 > p.base8: warn('Las devoluciones en región fronteriza exceden el valor de los actos')
     for name in ('tasa0', 'exento', 'no_objeto', 'iva_retenido'):
-        if getattr(p, name) < 0: errors.append(f'El valor de {name} queda negativo (más devoluciones que compras)')
-    if p.frontera not in (FRONTERA_NORTE, FRONTERA_SUR): errors.append(f'Región fronteriza inválida: {p.frontera}')
-    return errors
+        if getattr(p, name) < 0: warn(f'El valor de {name} queda negativo (más devoluciones que compras)')
+    for text in (p.tax_id, p.nombre_extranjero, p.pais, p.jurisdiccion):
+        if '|' in (text or ''): warn(f'Se reemplazó "|" por espacio en: {text}')
+    for aviso in p.warnings:
+        warn(aviso)
+    return issues
+
+
+def validate(p: DiotProvider, year: int) -> list[str]:
+    """Mensajes de todas las observaciones (advertencias y errores) del proveedor."""
+    return [i.message for i in check(p, year)]
 
 
 def build_lines(providers, year: int, efectos_fiscales='01') -> list[str]:
     lines = []
     for p in providers:
         row = line_2025(p, efectos_fiscales) if year >= 2025 else line_2024(p, year)
-        for value in row:
-            if '|' in value:
-                raise ValueError(f'El valor contiene "|": {value}')
-        lines.append('|'.join(row))
+        lines.append('|'.join(value.replace('|', ' ') for value in row))
     return lines
 
 
-def export(path: Path, providers, year: int, efectos_fiscales='01') -> Path:
-    """Escribe el TXT. Lanza ValueError si algún proveedor tiene errores de validación."""
-    providers = [p for p in providers if p.documentos]
-    errors = {p.rfc: e for p in providers if (e := validate(p, year))}
-    if errors:
-        detail = '\n'.join(f'{rfc}: {"; ".join(e)}' for rfc, e in errors.items())
-        raise ValueError(f'Hay proveedores con errores:\n{detail}')
+def summarize(providers, year: int) -> dict[str, list[Issue]]:
+    """{rfc: observaciones} de los proveedores que tienen alguna."""
+    return {p.rfc: issues for p in providers if p.documentos and (issues := check(p, year))}
 
+
+def export(path: Path, providers, year: int, efectos_fiscales='01') -> Path:
+    """Escribe el TXT aunque haya observaciones (la interfaz las muestra antes de exportar)."""
+    providers = [p for p in providers if p.documentos]
     path.parent.mkdir(parents=True, exist_ok=True)
-    content = '\r\n'.join(build_lines(providers, year, efectos_fiscales))
-    path.write_bytes((content + '\r\n').encode('utf-8') if content else b'')
+    content = CRLF.join(build_lines(providers, year, efectos_fiscales))
+    path.write_bytes((content + CRLF).encode('utf-8') if content else b'')
     return path
 
 

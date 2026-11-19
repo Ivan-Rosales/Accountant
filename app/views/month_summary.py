@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QVBoxLayout, QCheckBox, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
 
 from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
@@ -7,6 +7,7 @@ from app.widgets.common import QProgressButton
 from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
+from app.widgets.switch import QSwitchField
 from app.workers.month_summary import MonthSummaryWorker
 from base.tab import TabWidget
 from exceptions import ValidationException
@@ -25,7 +26,7 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
     def create_ui(self):
         self.selector = QFilesSelector(self, filter="*.zip")
         self.selector.setProperty('class', 'dropzone')
-        self.prov_check = QCheckBox('Generar también el reporte por proveedor', self)
+        self.prov_check = QSwitchField(self, text='Generar también el reporte por proveedor')
 
         self.rules = QLabel(self)
         self.rules.setProperty('class', 'secondary')

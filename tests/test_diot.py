@@ -117,11 +117,27 @@ def test_export_utf8_crlf(tmp_path, xml_dir):
     assert all(line.count('|') == 53 for line in lines[:-1])
 
 
-def test_export_rechaza_errores(tmp_path, xml_dir):
+def test_export_con_advertencias_genera_el_archivo(tmp_path, xml_dir):
     (p,) = aggregate(parse(xml_dir, [compra([Concepto(100)], emisor='XEXX010101000')]))
-    with pytest.raises(ValueError, match='errores'):
-        export(tmp_path / 'diot.txt', [p], 2025)
-    assert not (tmp_path / 'diot.txt').exists()
+    issues = diot.summarize([p], 2025)[p.rfc]
+    assert issues and all(i.level == diot.ADVERTENCIA for i in issues)
+    path = export(tmp_path / 'diot.txt', [p], 2025)
+    assert path.read_text(encoding='utf-8').startswith('05|85|')
+
+
+def test_clave_no_reconocida_es_error_pero_exporta(tmp_path, xml_dir):
+    (p,) = aggregate(parse(xml_dir, [compra([Concepto(100)])]))
+    p.tipo_operacion = '99'
+    (issue,) = diot.check(p, 2025)
+    assert issue.level == diot.ERROR
+    assert export(tmp_path / 'diot.txt', [p], 2025).exists()
+
+
+def test_pipe_en_texto_se_reemplaza(xml_dir):
+    (p,) = aggregate(parse(xml_dir, [compra([Concepto(100)], emisor='XEXX010101000')]))
+    p.apply(DiotSettings(tax_id='12|3', nombre_extranjero='ACME', pais='USA'))
+    (line,) = diot.build_lines([p], 2025)
+    assert line.count('|') == 53 and '12 3' in line
 
 
 def test_desde_registros_de_bd(tmp_path):

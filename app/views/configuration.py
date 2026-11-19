@@ -11,6 +11,7 @@ from app.widgets.common import QButton
 from app.widgets.file_selector import QDirSelector
 from app.widgets.import_files import QImportWidget
 from app.widgets.option_selector import QOptionSelector
+from app.widgets.switch import QSwitchField
 from base.tab import TabWidget
 from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from functions import get_icon
@@ -73,9 +74,10 @@ class QConfiguration(TabWidget):
         },
         'diot-efectos': {
             'section': 'calculo',
-            'label': 'DIOT: se dio efectos fiscales a los comprobantes (campo 54)',
-            'widget': QOptionSelector,
-            'options': DIOT_EFECTOS,
+            'label': 'DIOT (campo 54)',
+            'widget': QSwitchField,
+            'text': 'Se dio efectos fiscales a los comprobantes',
+            'values': ('01', '02'),
             'default': '01',
         },
     }
@@ -93,7 +95,9 @@ class QConfiguration(TabWidget):
             widget_class = description['widget']
             if isinstance(widget_class, QWidget):  # ya instanciado por otra ventana
                 widget_class = type(widget_class)
-            kwargs = {'options': description['options']} if widget_class is QOptionSelector else {}
+            kwargs = {}
+            if widget_class is QOptionSelector: kwargs = {'options': description['options']}
+            if widget_class is QSwitchField: kwargs = {'text': description['text'], 'values': description['values']}
             widget = widget_class(self, **kwargs)
             self.fields[label]['widget'] = widget
             self.set_value(widget, settings.value(label) or description.get('default'))
@@ -110,6 +114,10 @@ class QConfiguration(TabWidget):
 
         self.save_btn = QButton('guardar', self, fn=self.save_configuration)
         self.save_btn.setProperty('class', 'primary')
+
+        self.discard_btn = QButton('descartar cambios', self, fn=self.discard_changes)
+        self.discard_btn.setToolTip('Regresar a la configuración guardada')
+        self.discard_btn.setEnabled(False)
 
         self.reset_btn = QButton(get_icon('recurring'), self, fn=self.reset_configuration, icon_opacity=0.5)
         self.reset_btn.setToolTip('Regresar a la configuración por defecto')
@@ -157,11 +165,14 @@ class QConfiguration(TabWidget):
         footer.addWidget(self.label)
         footer.addStretch(1)
         footer.addWidget(self.reset_btn)
+        footer.addWidget(self.discard_btn)
         footer.addWidget(self.save_btn)
         layout.addLayout(footer)
 
     def on_change(self, label, value):
+        if getattr(self, '_reverting', False): return
         self.touched[label] = value
+        self.discard_btn.setEnabled(True)
 
         widget = self.widgets[label]
         widget.setProperty('class', 'invalid')
@@ -170,7 +181,7 @@ class QConfiguration(TabWidget):
     def get_value(self, widget):
         if isinstance(widget, QDirSelector):
             return str(widget.get_path())
-        if isinstance(widget, (QThemePicker, QOptionSelector)):
+        if isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField)):
             return widget.get_value()
 
         logger.warning(f'{self.__class__.__name__} is not defined get_value for {widget.__class__.__name__}')
@@ -180,7 +191,7 @@ class QConfiguration(TabWidget):
         if isinstance(widget, QDirSelector):
             widget.setPlaceholderText(value)
             widget.setPath(value)
-        elif isinstance(widget, (QThemePicker, QOptionSelector)):
+        elif isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField)):
             widget.set_value(value)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_value for {widget.__class__.__name__}')
@@ -193,7 +204,7 @@ class QConfiguration(TabWidget):
             widget.changeDir.connect(changed)
         elif isinstance(widget, QThemePicker):
             widget.changeTheme.connect(changed)
-        elif isinstance(widget, QOptionSelector):
+        elif isinstance(widget, (QOptionSelector, QSwitchField)):
             widget.changeOption.connect(changed)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_on_change for {widget.__class__.__name__}')
@@ -213,7 +224,23 @@ class QConfiguration(TabWidget):
 
         self.touched.clear()
         self.label.hide()
+        self.discard_btn.setEnabled(False)
         logger.debug('Configuration saved')
+
+    def discard_changes(self):
+        """Vuelve a los valores guardados sin aplicar nada."""
+        self._reverting = True
+        try:
+            for label in list(self.touched):
+                description = self.fields[label]
+                self.set_value(description['widget'], settings.value(label) or description.get('default'))
+                self.widgets[label].setProperty('class', None)
+        finally:
+            self._reverting = False
+        self.touched.clear()
+        self.label.hide()
+        self.discard_btn.setEnabled(False)
+        logger.info(f'{self.__class__.__name__} discarded changes')
 
     def get_conf_value(self, label):
         return self.get_value(self.widgets[label])
