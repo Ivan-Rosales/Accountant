@@ -12,6 +12,12 @@ from logger import logger
 from models import Cliente
 
 
+def carried_iva_balance(previous: Decimal) -> Decimal:
+    """Saldo que pasa al mes siguiente: solo el saldo a favor (negativo)."""
+    previous = Decimal(previous or 0)
+    return previous if previous < 0 else Decimal(0)
+
+
 class YearSummary(WorkbookExecution):
     def __init__(self, client: Cliente, year: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -32,7 +38,7 @@ class YearSummary(WorkbookExecution):
         if not isinstance(self.client, Cliente):
             raise ValidationException('No se ha asignado un cliente')
 
-    def generate_sheet(self, month, replace=False, force_new=False, prev=None):
+    def generate_sheet(self, month, replace=False, force_new=False, prev=None, payment=False):
         name = month_name[month].capitalize()
         logger.info(f'{self.__class__.__name__} generating sheet {name} {month}')
 
@@ -49,7 +55,7 @@ class YearSummary(WorkbookExecution):
             sheet.page_setup.orientation = sheet.ORIENTATION_LANDSCAPE
 
         self.set_labels(sheet, month)
-        self.set_data(sheet, month, prev, replace=replace)
+        self.set_data(sheet, month, prev, replace=replace, payment=payment)
         self.set_format(sheet)
 
         # La hoja de pago se arma después, cuando el mes anterior ya está actualizado
@@ -76,9 +82,10 @@ class YearSummary(WorkbookExecution):
 
         total_ingresos = Decimal(prev_sheet.cell(row=6, column=2).value)
         total_egresos = Decimal(prev_sheet.cell(row=7, column=2).value)
-        total_iva = Decimal(prev_sheet.cell(row=24, column=2).value)
+        # Pago bimestral: se suma el saldo completo del mes anterior (a cargo o a favor)
+        total_iva = Decimal(prev_sheet.cell(row=26, column=2).value or 0)
 
-        sheet = self.generate_sheet(month, force_new=True, prev=(total_ingresos, total_egresos, total_iva))
+        sheet = self.generate_sheet(month, force_new=True, prev=(total_ingresos, total_egresos, total_iva), payment=True)
         sheet.title = self.payment_sheet_name(month)
 
         sheet.cell(row=11, column=1).value = f'total de ingresos de {prev_name}'.upper()
@@ -89,7 +96,7 @@ class YearSummary(WorkbookExecution):
         def get_totals_label(label) -> str:
             if month == 1: return ''
             if month == 2: return f'total de {label} de {month_name[month - 1]}'
-            return f'total de ingresos de {label} de enero a {month_name[month - 1]}'
+            return f'total de {label} de enero a {month_name[month - 1]}'
 
         name = month_name[month].capitalize()
 
@@ -157,7 +164,7 @@ class YearSummary(WorkbookExecution):
         rev = kind == 'ingresos'
         return MonthSummary(self.client, year=self.year, month=month, rev=rev)
 
-    def set_data(self, sheet, month, previous=None, replace=False):
+    def set_data(self, sheet, month, previous=None, replace=False, payment=False):
         if isinstance(previous, (list, tuple)) and len(previous) == 3:
             prev_ingresos, prev_egresos, prev_iva = previous
         else:
@@ -196,12 +203,16 @@ class YearSummary(WorkbookExecution):
         # Totals
         sheet.cell(row=20, column=6).value = ingresos_total - egresos_total
 
-        iva_diff = abs(ingresos_file.iva - egresos_file.iva)
+        # Convención: positivo = IVA a cargo, negativo = IVA a favor.
+        # Solo el saldo a favor se arrastra al mes siguiente; el saldo a cargo se paga y no se acumula.
+        iva_diff = ingresos_file.iva - egresos_file.iva
+        saldo_anterior = Decimal(prev_iva or 0) if payment else carried_iva_balance(prev_iva)
         sheet.cell(row=22, column=2).value = ingresos_file.iva
         sheet.cell(row=23, column=2).value = egresos_file.iva
         sheet.cell(row=24, column=2).value = iva_diff
-        sheet.cell(row=25, column=2).value = prev_iva
-        sheet.cell(row=26, column=2).value = abs(iva_diff - prev_iva)
+        sheet.cell(row=25, column=2).value = saldo_anterior
+        sheet.cell(row=26, column=2).value = iva_diff + saldo_anterior
+        sheet.cell(row=26, column=4).value = 'A FAVOR' if iva_diff + saldo_anterior < 0 else 'A CARGO'
 
     def set_format(self, sheet):
         for row in range(1, sheet.max_row + 1):

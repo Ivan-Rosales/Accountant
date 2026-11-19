@@ -67,17 +67,13 @@ CASES = [
     Case('v40_nomina', _cfdi(tipo='N', conceptos=[Concepto(5000, traslados=[])]), _exp(5000, tipo='N')),
     Case('v40_usd',
          _cfdi(moneda='USD', tipo_cambio=D('17.5000'), conceptos=[Concepto(100)]),
-         _exp(2030, iva=280),
-         phase1='No convierte con TipoCambio: suma USD como si fueran pesos', legacy_ok=False),
-    Case('v33_iva16', _cfdi(version='3.3', conceptos=[Concepto(1000)]), _exp(1160, iva=160),
-         phase1='Solo lee el namespace de CFDI 4.0'),
+         _exp(2030, iva=280), legacy_ok=False),
+    Case('v33_iva16', _cfdi(version='3.3', conceptos=[Concepto(1000)]), _exp(1160, iva=160)),
     Case('v33_honorarios_retenciones',
          _cfdi(version='3.3', emisor_rfc=PERSONA_FISICA_RFC, receptor_rfc=CLIENTE_RFC,
                conceptos=[Concepto(10000, retenciones=[Retencion(IVA, '0.106667'), Retencion(ISR, '0.100000')])]),
-         _exp(9533.33, iva=1600, ret_iva=1066.67, ret_isr=1000),
-         phase1='Solo lee el namespace de CFDI 4.0'),
-    Case('v32_iva16', _cfdi(version='3.2', conceptos=[Concepto(1000)]), _exp(1160, iva=160),
-         phase1='No soporta CFDI 3.2 (atributos en minúscula)'),
+         _exp(9533.33, iva=1600, ret_iva=1066.67, ret_isr=1000)),
+    Case('v32_iva16', _cfdi(version='3.2', conceptos=[Concepto(1000)]), _exp(1160, iva=160)),
 ]
 
 CASES_BY_ID = {c.id: c for c in CASES}

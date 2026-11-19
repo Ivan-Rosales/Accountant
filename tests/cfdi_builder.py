@@ -127,7 +127,9 @@ class Cfdi:
         v4 = self.version == '4.0'
         is_pago = self.tipo == 'P'
         conceptos = ''
-        for c in self.conceptos:
+        for n, c in enumerate(self.conceptos):
+            # Como en un CFDI real, el descuento global es la suma de los descuentos por concepto
+            desc = {'Descuento': money(self.descuento)} if self.descuento and n == 0 else {}
             tras = []
             for t in c.traslados:
                 base = money(t.base if t.base is not None else c.importe)
@@ -143,7 +145,7 @@ class Cfdi:
             if tras or rets:
                 imp = f'<cfdi:Impuestos>{self._group("Traslados", tras)}{self._group("Retenciones", rets)}</cfdi:Impuestos>'
             obj = {'ObjetoImp': '02' if (tras or rets) else '01'} if v4 else {}
-            conceptos += (f'<cfdi:Concepto {self._attrs(ClaveProdServ="01010101", Cantidad="1", ClaveUnidad="E48", Descripcion=c.descripcion, ValorUnitario=c.importe, Importe=c.importe, **obj)}>'
+            conceptos += (f'<cfdi:Concepto {self._attrs(ClaveProdServ="01010101", Cantidad="1", ClaveUnidad="E48", Descripcion=c.descripcion, ValorUnitario=c.importe, Importe=c.importe, **desc, **obj)}>'
                           f'{imp}</cfdi:Concepto>')
 
         # Impuestos globales: agrupados por impuesto/tasa como lo hace el PAC

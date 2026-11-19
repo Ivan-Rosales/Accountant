@@ -1,6 +1,6 @@
 from calendar import month_name
 from collections import defaultdict
-from decimal import Decimal, ROUND_HALF_DOWN
+from decimal import Decimal
 from functools import cached_property
 from pathlib import Path
 from typing import Dict
@@ -10,6 +10,9 @@ from openpyxl.styles import Alignment
 from base.execution import WorkbookExecution
 from exceptions import ValidationException
 from execution.xml_file import XmlFile
+
+GENERIC_RFCS = {'XAXX010101000', 'XEXX010101000'}
+PUBLICO_EN_GENERAL = 'PUBLICO EN GENERAL'
 from functions import normalize_number, decimal_property
 from logger import logger
 from models import Cliente
@@ -96,14 +99,30 @@ class MonthSummary(WorkbookExecution):
             )
 
     def add_files_in_folder(self, path: Path):
-        iterdir = path.iterdir()
-        files = [i for i in iterdir if i.is_file()]
-        xml_paths = [i for i in files if i.suffix == '.xml']
+        xml_paths = sorted(i for i in path.rglob('*') if i.is_file() and i.suffix.lower() == '.xml')
         xml_files = [XmlFile(i) for i in xml_paths]
         xml_files.sort(key=lambda x: x.date)
 
         self.xml_files = {i.uuid: i for i in xml_files}
+        self.validate_batch(list(self.xml_files.values()))
         self.process_files()
+
+    def validate_batch(self, xml_files):
+        """Un concentrado es de un solo mes y un solo tipo (ingresos o egresos)."""
+        for xml in xml_files:
+            self.validate_file(xml)
+
+        relevant = [i for i in xml_files if i.tipo != 'N']
+        months = sorted({(i.date.year, i.date.month) for i in relevant})
+        if len(months) > 1:
+            labels = ', '.join(f'{month_name[m].capitalize()} {y}' for y, m in months)
+            raise ValidationException(f'Los archivos son de varios meses ({labels}).\n'
+                                      f'Genere un ZIP por mes.')
+
+        kinds = {self.client.rfc == i.emisor.rfc for i in relevant}
+        if len(kinds) > 1:
+            raise ValidationException('Los archivos mezclan facturas emitidas (ingresos) y recibidas (egresos).\n'
+                                      'Genere un ZIP para cada tipo.')
 
     def process_files(self):
         for xml_file in self.xml_files.values():
@@ -125,14 +144,57 @@ class MonthSummary(WorkbookExecution):
 
         self.header_set = True
 
-    def set_columns(self):
+    @property
+    def column_labels(self):
         columns = ['subtotal', 'iva', 'total']
 
         if self.has_ieps:
             columns = ['no gravado', 'gravado', 'ieps', 'iva', 'total']
 
-        if self.has_ret_isr or self.has_ret_iva:
+        if self.has_ret:
             columns += ['ret iva', 'ret isr', 'neto']
+
+        return columns
+
+    def row_values(self, xml) -> dict:
+        """Importes del renglón en pesos. Notas de crédito (E) en negativo; pagos (P) en cero.
+
+        - TOTAL es el importe antes de retenciones y NETO lo efectivamente cobrado/pagado.
+        - SUBTOTAL = TOTAL - IVA - IEPS: incluye impuestos locales y cualquier diferencia de
+          redondeo del CFDI, para que el renglón siempre cuadre con el total.
+        - GRAVADO es el valor de actos a tasa de IVA > 0, leído de los conceptos (no IVA x 6.25).
+        """
+        zero = Decimal(0)
+        if xml.tipo == 'P':
+            return {k: zero for k in ('subtotal', 'no gravado', 'gravado', 'ieps', 'iva', 'total',
+                                      'ret iva', 'ret isr', 'neto')}
+
+        sign = Decimal(-1) if xml.tipo == 'E' else Decimal(1)
+        neto = xml.total * sign
+        ret_iva = xml.ret_iva * sign
+        ret_isr = xml.ret_isr * sign
+        iva = xml.iva * sign
+        ieps = xml.ieps * sign
+        total = neto + ret_iva + ret_isr
+        subtotal = total - iva - ieps
+
+        gravado = getattr(xml, 'gravado', None)
+        gravado = subtotal if gravado is None else min(gravado * sign, subtotal, key=abs)
+
+        return {
+            'subtotal': subtotal,
+            'gravado': gravado,
+            'no gravado': subtotal - gravado,
+            'ieps': ieps,
+            'iva': iva,
+            'total': total if self.has_ret else neto,
+            'ret iva': ret_iva,
+            'ret isr': ret_isr,
+            'neto': neto,
+        }
+
+    def set_columns(self):
+        columns = self.column_labels
 
         for column, label in enumerate(columns, self.column_data):
             self.sheet.cell(row=self.columns_row, column=column).value = label.upper()
@@ -148,68 +210,18 @@ class MonthSummary(WorkbookExecution):
 
         if xml.tipo == 'N': return
 
-        kind = self.rev
         row = row or max([6, self.sheet.max_row + 1])
+        values = self.row_values(xml)
+
+        counterpart = xml.receptor if self.rev else xml.emisor
+        name = PUBLICO_EN_GENERAL if counterpart.rfc in GENERIC_RFCS else (counterpart.name or counterpart.rfc)
 
         self.sheet.cell(row=row, column=1).value = xml.date
-        self.sheet.cell(row=row, column=2).value = (xml.receptor.name if kind else xml.emisor.name).upper()
+        self.sheet.cell(row=row, column=2).value = (name or '').upper()
         self.sheet.cell(row=row, column=3).value = f'F/{xml.uuid.split('-')[-1]}'.upper()
 
-        gravado = normalize_number(xml.iva * Decimal(6.25) if self.has_ieps else 0, rounding=ROUND_HALF_DOWN)
-        subtotal = xml.total - xml.ieps - xml.iva - gravado
-        total = xml.total
-        ieps = xml.ieps
-        iva = xml.iva
-
-        total_prev = None
-
-        # delete insignificant values
-        if self.has_ieps and 1.16 < total:
-            if abs(subtotal) < 1 or subtotal < 0:
-                gravado += subtotal
-                subtotal = Decimal(0)
-
-        # type P invoices have no effect
-        if xml.tipo == 'P':
-            subtotal = gravado = ieps = iva = total = Decimal(0)
-
-        # type E invoices have reverse effect
-        if xml.tipo == 'E':
-            subtotal = subtotal * Decimal(-1)
-            gravado = gravado * Decimal(-1)
-            total = total * Decimal(-1)
-            ieps = ieps * Decimal(-1)
-            iva = iva * Decimal(-1)
-
-        if self.has_ret:
-            total_prev = total + xml.ret_iva + xml.ret_isr
-            subtotal = total_prev - iva
-
-            if self.has_ieps:
-                if 0 < iva and 0 <= (xml.iva * Decimal(6.25) - gravado - ieps) < 1:
-                    subtotal = Decimal(0)
-
-                if 0.1 < abs(total_prev - ieps - iva - gravado - subtotal):
-                    gravado = total_prev - ieps - iva
-                    subtotal = Decimal(0)
-
-        column = 4
-        self.sheet.cell(row=row, column=column).value = subtotal
-
-        if self.has_ieps:
-            self.sheet.cell(row=row, column=column + 1).value = gravado
-            self.sheet.cell(row=row, column=column + 2).value = ieps
-            column += 2
-
-        self.sheet.cell(row=row, column=column + 1).value = iva
-
-        if self.has_ret and total_prev:
-            self.sheet.cell(row=row, column=column + 2).value = total_prev
-            self.sheet.cell(row=row, column=column + 3).value = xml.ret_iva
-            self.sheet.cell(row=row, column=column + 4).value = xml.ret_isr
-            column += 3
-
-        self.sheet.cell(row=row, column=column + 2).value = total
+        for column, label in enumerate(self.column_labels, self.column_data):
+            self.sheet.cell(row=row, column=column).value = values[label]
 
         logger.info(f'{self.__class__.__name__} added file {xml.uuid}')
 

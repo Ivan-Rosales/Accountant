@@ -58,7 +58,6 @@ def test_un_mes_a_cargo(cliente, xml_dir):
     assert iva_block(sheet) == [160, 80, 80, 0, 80]
 
 
-@pytest.mark.xfail(strict=True, reason='Fase 1: el saldo de IVA usa abs() y pierde el signo (a favor vs a cargo)')
 def test_saldo_a_favor_se_acumula(cliente, xml_dir):
     # Convención propuesta: positivo = a cargo, negativo = a favor (a validar con la contadora)
     month_file(cliente, xml_dir, 1, ingresos=[100], egresos=[300])  # IVA 16 - 48 = -32 (a favor)
@@ -94,3 +93,29 @@ def test_regenerar_abril_no_duplica_hojas_ni_pago(cliente, xml_dir):
     pago = wb[f'{names[3]} pago']
     assert pago.cell(6, 2).value == 400
     assert pago.cell(11, 5).value == 300
+
+
+def test_saldo_a_cargo_no_se_arrastra(cliente, xml_dir):
+    month_file(cliente, xml_dir, 1, ingresos=[1000], egresos=[500])  # 160 - 80 = 80 a cargo (se paga)
+    month_file(cliente, xml_dir, 2, ingresos=[100], egresos=[300])   # 16 - 48 = -32 a favor
+    wb, febrero = year_sheet(cliente, 2)
+    assert iva_block(wb[febrero]) == [16, 48, -32, 0, -32]
+    assert wb[febrero].cell(26, 4).value == 'A FAVOR'
+
+
+def test_saldo_a_favor_se_compensa(cliente, xml_dir):
+    month_file(cliente, xml_dir, 1, ingresos=[100], egresos=[300])   # -32 a favor
+    month_file(cliente, xml_dir, 2, ingresos=[1000], egresos=[500])  # 80 a cargo - 32 = 48
+    wb, febrero = year_sheet(cliente, 2)
+    assert iva_block(wb[febrero]) == [160, 80, 80, -32, 48]
+    assert wb[febrero].cell(26, 4).value == 'A CARGO'
+
+
+def test_pago_bimestral_suma_saldo_completo(cliente, xml_dir):
+    month_file(cliente, xml_dir, 1, ingresos=[100], egresos=[100])   # 0
+    month_file(cliente, xml_dir, 2, ingresos=[100], egresos=[100])   # 0
+    month_file(cliente, xml_dir, 3, ingresos=[1000], egresos=[500])  # +80 a cargo
+    month_file(cliente, xml_dir, 4, ingresos=[1000], egresos=[500])  # +80 a cargo
+    wb, abril = year_sheet(cliente, 4)
+    assert iva_block(wb[abril])[-1] == 80            # mensual: marzo a cargo no se arrastra
+    assert iva_block(wb[f'{abril} pago'])[-1] == 160  # bimestral: marzo + abril

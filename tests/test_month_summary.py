@@ -88,14 +88,12 @@ def test_rechaza_xml_de_otro_cliente(cliente, xml_dir):
         generate(cliente, xml_dir, [ajena])
 
 
-@pytest.mark.xfail(strict=True, reason='Fase 1: mes y tipo se toman del primer XML; un ZIP con varios meses cae en una sola hoja')
 def test_zip_con_varios_meses_no_se_mezcla(cliente, xml_dir):
     febrero = datetime(2025, 2, 3, 9, 0, 0)
     with pytest.raises(ValidationException):
         generate(cliente, xml_dir, [emitida(100), emitida(200, fecha=febrero)])
 
 
-@pytest.mark.xfail(strict=True, reason='Fase 1: nota de crédito con retenciones deja las retenciones en positivo')
 def test_nota_credito_con_retenciones_resta(cliente, xml_dir):
     from tests.cfdi_builder import Retencion, ISR
     nc = Cfdi(emisor_rfc=CLIENTE_RFC, receptor_rfc=PROVEEDOR_RFC, fecha=ENERO, tipo='E',
@@ -105,3 +103,37 @@ def test_nota_credito_con_retenciones_resta(cliente, xml_dir):
     (row,) = rows(sheet)
     # SUBTOTAL, IVA, TOTAL, RET IVA, RET ISR, NETO -> todo negativo
     assert row == (-1000, -160, -1160, 0, -100, -1060)
+
+
+def test_ieps_gravado_desde_conceptos(cliente, xml_dir):
+    summary = generate(cliente, xml_dir, [CASES_BY_ID['v40_ieps_iva'].cfdi])
+    sheet = load_workbook(summary.filename)[month_name[1].capitalize()]
+    assert [sheet.cell(4, c).value for c in range(4, 9)] == ['NO GRAVADO', 'GRAVADO', 'IEPS', 'IVA', 'TOTAL']
+    assert rows(sheet) == [(200, 500, 40, 86.4, 826.4)]
+
+
+def test_ieps_con_retenciones(cliente, xml_dir):
+    summary = generate(cliente, xml_dir, [CASES_BY_ID['v40_ieps_y_retenciones'].cfdi])
+    sheet = load_workbook(summary.filename)[month_name[1].capitalize()]
+    # NO GRAVADO, GRAVADO, IEPS, IVA, TOTAL, RET IVA, RET ISR, NETO
+    assert rows(sheet) == [(0, 1000, 80, 172.8, 1252.8, 0, 12.5, 1240.3)]
+
+
+def test_usd_en_pesos(cliente, xml_dir):
+    summary = generate(cliente, xml_dir, [CASES_BY_ID['v40_usd'].cfdi])
+    sheet = load_workbook(summary.filename)[month_name[1].capitalize()]
+    assert rows(sheet) == [(1750, 280, 2030)]
+
+
+def test_publico_en_general(cliente, xml_dir):
+    venta = Cfdi(emisor_rfc=CLIENTE_RFC, receptor_rfc='XAXX010101000', receptor_nombre='Juan Perez',
+                 fecha=ENERO, conceptos=[Concepto(100)])
+    summary = generate(cliente, xml_dir, [venta])
+    sheet = load_workbook(summary.filename)[month_name[1].capitalize()]
+    assert sheet.cell(6, 2).value == 'PUBLICO EN GENERAL'
+
+
+def test_rechaza_emitidas_y_recibidas_juntas(cliente, xml_dir):
+    recibida = Cfdi(emisor_rfc=PROVEEDOR_RFC, receptor_rfc=CLIENTE_RFC, fecha=ENERO, conceptos=[Concepto(300)])
+    with pytest.raises(ValidationException):
+        generate(cliente, xml_dir, [emitida(100), recibida])
