@@ -24,6 +24,10 @@ class AsyncExecutionMixin:
         getattr(self, f'worker{key}').moveToThread(getattr(self, f'thread{key}'))
         getattr(self, f'worker{key}').start.connect(getattr(self, f'worker{key}').on_start)
 
+        worker = getattr(self, f'worker{key}')
+        worker.success.connect(self.stop_loader)  # antes que on_success, que puede abrir un diálogo
+        worker.error.connect(self.stop_loader)
+
         attr = f'on_success{key}'
         if hasattr(self, attr): getattr(self, f'worker{key}').success.connect(getattr(self, attr))
 
@@ -58,6 +62,12 @@ class AsyncExecutionMixin:
             self.worker.start.emit(data)
 
         self.execute_btn.setEnabled(False)
+        if loader := getattr(self, 'loader', None):
+            loader.start(getattr(self, 'busy_message', 'Procesando...'))
+
+    def stop_loader(self, *_):
+        if loader := getattr(self, 'loader', None):
+            loader.stop()
 
     def on_success(self, *args, **kwargs):
         raise NotImplementedError

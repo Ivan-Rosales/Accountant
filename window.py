@@ -116,7 +116,7 @@ class MainWindow(BaseWindow):
         conf.register_change('dbdir', database_worker.reset)
         conf.register_change('theme', self.load_qss)
         conf.register_change('workdir', self.get_widget_tab('bar-char').set_workdir)
-        conf.register_change('diot-base', self.get_widget_tab('report-3').load_data)
+        conf.register_change('diot-base', self.get_widget_tab('report-3').request_load)
         self.load_qss(conf.get_conf_value('theme'))
         self.header.setFocus()
 

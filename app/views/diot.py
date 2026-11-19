@@ -7,8 +7,10 @@ from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget
                                QHeaderView, QMessageBox)
 
 from app.core.settings import settings
+from app.core.tasks import TaskRunner
 from app.widgets.common import QButton
 from app.widgets.confirm_box import QConfirmMessageBox
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.switch import QClickComboBox
 from app.widgets.period_selector import QPeriodSelector, show_message
 from app.workers.database import database_worker
@@ -58,8 +60,11 @@ class QDiot(TabWidget):
         self.export_btn = QButton('exportar txt', self, fn=self.export)
         self.export_btn.setProperty('class', 'primary')
 
-        self.period.changed.connect(self.load_data)
-        self.client_selector.on_change(self.load_data)
+        self.tasks = TaskRunner(self)
+        self.loader = QLoadingOverlay(self.table)
+
+        self.period.changed.connect(self.request_load)
+        self.client_selector.on_change(self.request_load)
 
     @property
     def base(self):
@@ -83,24 +88,34 @@ class QDiot(TabWidget):
         bottom.addWidget(self.export_btn)
         layout.addLayout(bottom)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.load_data()
-
     # ---- datos ----------------------------------------------------------------
     def load_data(self, *_):
         client = self.client_selector.get_current()
-        self.providers, self.unpaid = [], []
-        if client is not None:
+        if client is None:
+            self.providers, self.unpaid = [], []
+            self.update_note()
+            self.fill_table()
+            return
+
+        base, year, month = self.base, self.period.year, self.period.month
+        self.note.setText('Calculando proveedores...')
+
+        def query():
             with database_worker.new_session() as session:
-                if self.base == 'facturado':
-                    records = cfdi_store.received_records(session, client, self.period.year, self.period.month)
+                unpaid = []
+                if base == 'facturado':
+                    records = cfdi_store.received_records(session, client, year, month)
                 else:
-                    records, self.unpaid = cfdi_store.cash_records(session, client, self.period.year,
-                                                                   self.period.month)
-                self.providers = diot.aggregate(records, cfdi_store.diot_settings(session, client))
-        self.update_note()
-        self.fill_table()
+                    records, unpaid = cfdi_store.cash_records(session, client, year, month)
+                return diot.aggregate(records, cfdi_store.diot_settings(session, client)), unpaid
+
+        def done(result):
+            self.providers, self.unpaid = result
+            self.update_note()
+            self.fill_table()
+
+        self.tasks.run('load', query, on_done=done, overlay=self.loader, message='Calculando proveedores...',
+                       on_error=lambda e: self.note.setText(f'No se pudo calcular la DIOT: {e}'))
 
     def update_note(self):
         if self.base == 'facturado':
@@ -196,10 +211,24 @@ class QDiot(TabWidget):
     def save_settings(self, quiet=False):
         client = self.client_selector.get_current()
         if client is None or not self.providers: return
-        with database_worker.new_session() as session:
-            cfdi_store.save_diot_settings(session, client, self.providers)
-        if not quiet:
-            show_message(self, f'Se guardaron los ajustes de {len(self.providers)} proveedores.', title='Listo')
+        providers = list(self.providers)
+
+        def save():
+            with database_worker.new_session() as session:
+                cfdi_store.save_diot_settings(session, client, providers)
+
+        def done(_):
+            self.save_btn.setEnabled(True)
+            if not quiet:
+                show_message(self, f'Se guardaron los ajustes de {len(providers)} proveedores.', title='Listo')
+
+        def failed(error):
+            self.save_btn.setEnabled(True)
+            show_message(self, f'No se pudieron guardar los ajustes: {error}', icon=QMessageBox.Icon.Warning,
+                         title='DIOT')
+
+        self.save_btn.setEnabled(False)
+        self.tasks.run('save', save, on_done=done, on_error=failed)
 
     def export(self):
         client = self.client_selector.get_current()
@@ -226,11 +255,24 @@ class QDiot(TabWidget):
                                icon=QMessageBox.Icon.Warning)
             if not confirmed: return
 
-        path = diot.default_filename(settings.get_workdir(), client.rfc, self.period.year, self.period.month)
-        diot.export(path, self.providers, self.period.year, self.efectos_fiscales)
+        year = self.period.year
+        providers = list(self.providers)
+        path = diot.default_filename(settings.get_workdir(), client.rfc, year, self.period.month)
+        efectos = self.efectos_fiscales
 
-        self.save_settings(quiet=True)
-        layout = '2025 en adelante' if self.period.year >= 2025 else '2024 y anteriores'
-        note = f'\nCon observaciones en {len(issues)} proveedor(es).' if issues else ''
-        QConfirmMessageBox(self, f'Se generó la DIOT ({layout}, {len(self.providers)} proveedores):\n{path}{note}\n'
-                                 f'¿Desea abrir la carpeta?', lambda: os.startfile(path.parent), title='DIOT')
+        def done(_):
+            self.export_btn.setEnabled(True)
+            self.save_settings(quiet=True)
+            layout = '2025 en adelante' if year >= 2025 else '2024 y anteriores'
+            note = f'\nCon observaciones en {len(issues)} proveedor(es).' if issues else ''
+            QConfirmMessageBox(self, f'Se generó la DIOT ({layout}, {len(providers)} proveedores):\n{path}{note}\n'
+                                     f'¿Desea abrir la carpeta?', lambda: os.startfile(path.parent), title='DIOT')
+
+        def failed(error):
+            self.export_btn.setEnabled(True)
+            show_message(self, f'No se pudo escribir el archivo: {error}', icon=QMessageBox.Icon.Warning,
+                         title='DIOT')
+
+        self.export_btn.setEnabled(False)
+        self.tasks.run('export', lambda: diot.export(path, providers, year, efectos), on_done=done, on_error=failed,
+                       overlay=self.loader, message='Generando TXT...')

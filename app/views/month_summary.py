@@ -6,6 +6,7 @@ from app.widgets.card import card
 from app.widgets.common import QProgressButton
 from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.metrics import QMetrics
 from app.widgets.switch import QSwitchField
 from app.workers.month_summary import MonthSummaryWorker
@@ -22,6 +23,7 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
     page_subtitle = 'Genera el concentrado de ingresos o egresos a partir de los ZIP de facturas del SAT'
 
     worker_class = MonthSummaryWorker
+    busy_message = 'Generando concentrado...'
 
     def create_ui(self):
         self.selector = QFilesSelector(self, filter="*.zip")
@@ -46,6 +48,7 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
 
     def load_ui(self, layout):
         frame, frame_layout = card(self, 'Archivos', 'Uno o varios ZIP descargados del SAT; uno por mes y tipo')
+        self.loader = QLoadingOverlay(frame)
         frame_layout.addWidget(self.selector)
         frame_layout.addWidget(self.prov_check)
         frame_layout.addWidget(self.rules)

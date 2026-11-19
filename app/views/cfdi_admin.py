@@ -2,12 +2,13 @@
 from decimal import Decimal
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem, QLabel,
                                QAbstractItemView, QHeaderView, QMessageBox, QWidget)
 
 from app.core.settings import settings
+from app.core.tasks import TaskRunner
 from app.widgets.common import QButton
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.period_selector import QPeriodSelector, show_message
 from app.widgets.switch import QSwitch, QClickComboBox
 from app.workers.database import database_worker
@@ -58,9 +59,12 @@ class QCfdiAdmin(TabWidget):
         self.regenerate_btn.setProperty('class', 'primary')
         self.regenerate_btn.setToolTip('Vuelve a generar la hoja del mes con los comprobantes no cancelados')
 
-        self.period.changed.connect(self.load_data)
-        self.kind.currentIndexChanged.connect(self.load_data)
-        self.client_selector.on_change(self.load_data)
+        self.tasks = TaskRunner(self)
+        self.loader = QLoadingOverlay(self.table)
+
+        self.period.changed.connect(self.request_load)
+        self.kind.currentIndexChanged.connect(self.request_load)
+        self.client_selector.on_change(self.request_load)
         self._loading = False
         self.dirty = False
 
@@ -76,40 +80,47 @@ class QCfdiAdmin(TabWidget):
         bottom.addWidget(self.regenerate_btn)
         layout.addLayout(bottom)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.load_data()
-
     def load_data(self, *_):
         client = self.client_selector.get_current()
-        self._loading = True
-        self.table.setRowCount(0)
-        try:
-            if client is None:
-                self.summary.setText('Seleccione un cliente')
-                return
+        if client is None:
+            self.table.setRowCount(0)
+            self.summary.setText('Seleccione un cliente')
+            return
 
-            ingreso = self.kind.currentData()
+        ingreso, year, month = self.kind.currentData(), self.period.year, self.period.month
+        self.summary.setText('Cargando comprobantes...')
+
+        def query():
             with database_worker.new_session() as session:
-                records = cfdi_store.month_records(session, client, self.period.year, self.period.month, ingreso,
-                                                   include_cancelled=True)
+                return cfdi_store.month_records(session, client, year, month, ingreso, include_cancelled=True)
 
+        self.tasks.run('load', query, on_done=lambda records: self.show_records(records, ingreso),
+                       on_error=self.on_load_error, overlay=self.loader, message='Cargando comprobantes...')
+
+    def on_load_error(self, error):
+        self.summary.setText(f'No se pudieron cargar los comprobantes: {error}')
+
+    def show_records(self, records, ingreso):
+        self._loading = True
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(0)
             for record in records:
                 self.add_row(record, ingreso)
-
-            active = [r for r in records if not r.cancelado]
-            cancelled = len(records) - len(active)
-            if not records:
-                self.summary.setText('No hay comprobantes guardados de este periodo. '
-                                     'Se guardan al generar el concentrado mensual.')
-            else:
-                total = sum((r.total for r in active if r.tipo == 'I'), Decimal(0)) - \
-                        sum((r.total for r in active if r.tipo == 'E'), Decimal(0))
-                self.summary.setText(f'{len(records)} comprobantes · {cancelled} cancelados · '
-                                     f'total {money(total)}')
         finally:
+            self.table.setUpdatesEnabled(True)
             self._loading = False
             self.set_dirty(False)
+
+        active = [r for r in records if not r.cancelado]
+        cancelled = len(records) - len(active)
+        if not records:
+            self.summary.setText('No hay comprobantes guardados de este periodo. '
+                                 'Se guardan al generar el concentrado mensual.')
+        else:
+            total = (sum((r.total for r in active if r.tipo == 'I'), Decimal(0))
+                     - sum((r.total for r in active if r.tipo == 'E'), Decimal(0)))
+            self.summary.setText(f'{len(records)} comprobantes · {cancelled} cancelados · total {money(total)}')
 
     def add_row(self, record, ingreso):
         row = self.table.rowCount()
@@ -140,10 +151,15 @@ class QCfdiAdmin(TabWidget):
     def on_cancel_toggled(self, uuid, cancelled):
         if self._loading: return
         client = self.client_selector.get_current()
-        with database_worker.new_session() as session:
-            cfdi_store.set_cancelled(session, client, uuid, cancelled)
-        logger.info(f'CFDI {uuid} cancelado={cancelled}')
-        self.set_dirty(True)
+        self.set_dirty(True)  # la interfaz responde de inmediato; el guardado corre en segundo plano
+
+        def save():
+            with database_worker.new_session() as session:
+                cfdi_store.set_cancelled(session, client, uuid, cancelled)
+            logger.info(f'CFDI {uuid} cancelado={cancelled}')
+
+        self.tasks.run(f'cancel-{uuid}', save, on_error=lambda e: show_message(
+            self, f'No se pudo guardar el cambio: {e}', icon=QMessageBox.Icon.Warning, title='Comprobantes'))
 
     def set_dirty(self, dirty):
         self.dirty = dirty
@@ -151,26 +167,31 @@ class QCfdiAdmin(TabWidget):
 
     def regenerate(self):
         client = self.client_selector.get_current()
-        if client is None: return
-        ingreso = self.kind.currentData()
-        with database_worker.new_session() as session:
-            records = cfdi_store.month_records(session, client, self.period.year, self.period.month, ingreso)
+        if client is None or self.tasks.is_running('regenerate'): return
+        ingreso, year, month = self.kind.currentData(), self.period.year, self.period.month
+        summary = MonthSummary(client, nomina_importe=settings.value('nomina-importe'))
 
-        if not records:
-            show_message(self, 'No hay comprobantes vigentes para este periodo.', icon=QMessageBox.Icon.Warning,
-                         title='Sin comprobantes')
-            return
-
-        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            summary = MonthSummary(client, nomina_importe=settings.value('nomina-importe'))
+        def work():
+            with database_worker.new_session() as session:
+                records = cfdi_store.month_records(session, client, year, month, ingreso)
+            if not records: return None
             summary.add_records(records)
             summary.save()
-        except Exception as error:
-            QGuiApplication.restoreOverrideCursor()
-            show_message(self, str(error), icon=QMessageBox.Icon.Warning, title='No se pudo regenerar')
-            return
-        QGuiApplication.restoreOverrideCursor()
+            return summary
 
-        self.set_dirty(False)
-        show_message(self, f'Concentrado regenerado:\n{summary.filename}', title='Listo')
+        def done(result):
+            self.regenerate_btn.setEnabled(True)
+            if result is None:
+                show_message(self, 'No hay comprobantes vigentes para este periodo.',
+                             icon=QMessageBox.Icon.Warning, title='Sin comprobantes')
+                return
+            self.set_dirty(False)
+            show_message(self, f'Concentrado regenerado:\n{result.filename}', title='Listo')
+
+        def failed(error):
+            self.regenerate_btn.setEnabled(True)
+            show_message(self, str(error), icon=QMessageBox.Icon.Warning, title='No se pudo regenerar')
+
+        self.regenerate_btn.setEnabled(False)
+        self.tasks.run('regenerate', work, on_done=done, on_error=failed, overlay=self.loader,
+                       message='Regenerando concentrado...')
