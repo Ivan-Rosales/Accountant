@@ -11,6 +11,7 @@ from app.views.configuration import QConfiguration
 from app.views.diot import QDiot
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
+from app.widgets.animations import fade_in, FAST
 from app.widgets.common import spacer, QButton
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
@@ -157,7 +158,11 @@ class MainWindow(BaseWindow):
             self.setPropertyUpddate(to_active_btn, 'state', 'active')
             self.page_title.setText(getattr(to_show_widget, 'page_title', ''))
             self.page_subtitle.setText(getattr(to_show_widget, 'page_subtitle', ''))
+            was_visible = to_show_widget.isVisible()
             to_show_widget.show()
+            if not was_visible and self.isVisible():
+                fade_in(to_show_widget, slide=8)
+                fade_in(self.page_header, duration=FAST)
 
     def open_path(self):
         client = self.client_selector.get_current()

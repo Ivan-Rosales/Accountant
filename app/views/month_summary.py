@@ -4,7 +4,7 @@ from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
 from app.widgets.card import card
 from app.widgets.common import QProgressButton
-from app.widgets.confirm_box import QConfirmMessageBox
+from app.widgets.toast import toast
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.loader import QLoadingOverlay
 from app.widgets.metrics import QMetrics
@@ -88,6 +88,4 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
         self.metrics.add_registers_today(n_files)
         self.selector.clear()
 
-        title = '¿Desea abrirlo?'
-        message = f'Se generó correctamente.\n{summary.filename}\n{title}'
-        QConfirmMessageBox(self, message, summary.startfile, title=title)
+        toast(self, 'Concentrado generado', detail=summary.filename.name, action=('Abrir', summary.startfile))

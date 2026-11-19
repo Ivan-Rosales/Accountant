@@ -11,6 +11,8 @@ from app.core.tasks import TaskRunner
 from app.widgets.common import QButton
 from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.loader import QLoadingOverlay
+from app.widgets.message_dialog import KIND_SUCCESS, KIND_WARNING
+from app.widgets.toast import toast
 from app.widgets.switch import QClickComboBox
 from app.widgets.period_selector import QPeriodSelector, show_message
 from app.workers.database import database_worker
@@ -220,7 +222,7 @@ class QDiot(TabWidget):
         def done(_):
             self.save_btn.setEnabled(True)
             if not quiet:
-                show_message(self, f'Se guardaron los ajustes de {len(providers)} proveedores.', title='Listo')
+                toast(self, 'Ajustes guardados', detail=f'{len(providers)} proveedores')
 
         def failed(error):
             self.save_btn.setEnabled(True)
@@ -264,9 +266,10 @@ class QDiot(TabWidget):
             self.export_btn.setEnabled(True)
             self.save_settings(quiet=True)
             layout = '2025 en adelante' if year >= 2025 else '2024 y anteriores'
-            note = f'\nCon observaciones en {len(issues)} proveedor(es).' if issues else ''
-            QConfirmMessageBox(self, f'Se generó la DIOT ({layout}, {len(providers)} proveedores):\n{path}{note}\n'
-                                     f'¿Desea abrir la carpeta?', lambda: os.startfile(path.parent), title='DIOT')
+            note = f' · {len(issues)} con observaciones' if issues else ''
+            toast(self, 'DIOT generada', detail=f'{path.name}\nLayout {layout} · {len(providers)} proveedores{note}',
+                  kind=KIND_WARNING if issues else KIND_SUCCESS, action=('Abrir carpeta', lambda: os.startfile(path.parent)),
+                  duration=7000)
 
         def failed(error):
             self.export_btn.setEnabled(True)

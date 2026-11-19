@@ -9,6 +9,7 @@ from app.core.settings import settings
 from app.core.tasks import TaskRunner
 from app.widgets.common import QButton
 from app.widgets.loader import QLoadingOverlay
+from app.widgets.toast import toast
 from app.widgets.period_selector import QPeriodSelector, show_message
 from app.widgets.switch import QSwitch, QClickComboBox, QSwitchField
 from app.workers.database import database_worker
@@ -202,8 +203,8 @@ class QCfdiAdmin(TabWidget):
                              icon=QMessageBox.Icon.Warning, title='Sin comprobantes')
                 return
             self.set_dirty(False)
-            files = f'{result.filename}' + (f'\n{providers.filename}' if providers is not None else '')
-            show_message(self, f'Concentrado regenerado:\n{files}', title='Listo')
+            files = result.filename.name + (f' y {providers.filename.name}' if providers is not None else '')
+            toast(self, 'Concentrado regenerado', detail=files, action=('Abrir', result.startfile))
 
         def failed(error):
             self.regenerate_btn.setEnabled(True)

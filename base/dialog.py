@@ -40,6 +40,11 @@ class BaseDialog(TitleBarMixin, LoadUiMixin, FramelessDialog):
         open_dialogs[self.uuid] = True
         super().show()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        from app.widgets.animations import window_fade_in
+        window_fade_in(self)
+
     def hide(self):
         super().hide()
         open_dialogs[self.uuid] = False

@@ -29,10 +29,11 @@ KIND_STYLE = {  # color, símbolo
 class QModalIcon(QWidget):
     """Círculo de color con un símbolo; info y pregunta usan el color del tema."""
 
-    def __init__(self, parent=None, kind=KIND_INFO):
+    def __init__(self, parent=None, kind=KIND_INFO, size=40):
         super().__init__(parent)
         self.kind = kind
-        self.setFixedSize(40, 40)
+        self.size_px = size
+        self.setFixedSize(size, size)
 
     def set_kind(self, kind):
         self.kind = kind
@@ -49,14 +50,15 @@ class QModalIcon(QWidget):
         background.setAlpha(45)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(background)
-        painter.drawEllipse(QRectF(0, 0, 40, 40))
+        box = QRectF(0, 0, self.size_px, self.size_px)
+        painter.drawEllipse(box)
 
         font = QFont(self.font())
-        font.setPointSize(14)
+        font.setPointSize(max(9, int(self.size_px * 0.35)))
         font.setBold(True)
         painter.setFont(font)
         painter.setPen(color)
-        painter.drawText(QRectF(0, 0, 40, 40), Qt.AlignmentFlag.AlignCenter, symbol)
+        painter.drawText(box, Qt.AlignmentFlag.AlignCenter, symbol)
         painter.end()
 
 

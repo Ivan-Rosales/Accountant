@@ -13,7 +13,7 @@ from app.core.tasks import TaskRunner
 from app.mixin.async_execution import AsyncExecutionMixin
 from app.mixin.property_update import PropertyMixin
 from app.widgets.common import QButton, spacer, QProgressButton
-from app.widgets.confirm_box import QConfirmMessageBox
+from app.widgets.toast import toast
 from app.widgets.loader import QLoadingOverlay
 from app.widgets.period_selector import show_message
 from app.widgets.secondary_label import QSecondaryLabel
@@ -217,6 +217,4 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
         self.execute_btn.setEnabled(True)
         self.execute_btn.resetProgress()
 
-        title = '¿Desea abrirlo?'
-        message = f'Se generó correctamente.\n{summary.filename}\n{title}'
-        QConfirmMessageBox(self, message, summary.startfile, title=title)
+        toast(self, 'Concentrado anual generado', detail=summary.filename.name, action=('Abrir', summary.startfile))

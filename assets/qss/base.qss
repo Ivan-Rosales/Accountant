@@ -209,3 +209,19 @@ QLabel[class~="modal-title"] {
 QLabel[class~="modal-text"] {
     color: #c9d1d9;
 }
+
+/* Toasts */
+
+QFrame[class~="toast"] {
+    background-color: #262b31;
+    border: 1px solid #3d444d;
+    border-radius: 12px;
+}
+
+QFrame[class~="toast"] QLabel {
+    background-color: transparent;
+}
+
+QLabel[class~="toast-title"] {
+    font-weight: 600;
+}
