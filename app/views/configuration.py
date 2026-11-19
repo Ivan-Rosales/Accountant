@@ -187,7 +187,9 @@ class QConfiguration(TabWidget):
     def preview_theme(self, theme):
         """Aplica el tema a la ventana sin guardarlo (Guardar lo conserva, Descartar lo revierte)."""
         window = self.window()
-        if hasattr(window, 'load_qss'):
+        if hasattr(window, 'apply_theme'):
+            window.apply_theme(theme)
+        elif hasattr(window, 'load_qss'):
             window.load_qss(theme)
 
     def get_value(self, widget):

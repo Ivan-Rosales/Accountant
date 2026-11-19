@@ -42,8 +42,9 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
         settings.register_setting(
             'check-providers',
             self.prov_check.isChecked,
-            lambda x: self.prov_check.setChecked(x == 'true'),
+            lambda x: self.prov_check.setChecked(x in ('true', True)),
             'false',
+            signal=self.prov_check.toggled,
         )
 
     def load_ui(self, layout):

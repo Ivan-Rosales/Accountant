@@ -1,7 +1,8 @@
 import os
 
-from PySide6.QtCore import QSize
-from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget, QLabel
+from PySide6.QtCore import QSize, QTimer
+from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget, QLabel, QApplication
 
 from app import settings as app_settings
 from app.core.settings import settings
@@ -13,6 +14,7 @@ from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
 from app.widgets.animations import fade_in, FAST
 from app.widgets.common import spacer, QButton
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
 from app.workers.database import database_worker
@@ -50,6 +52,9 @@ class MainWindow(BaseWindow):
         self._tabs = {}
         self.active_tab = None
         super().__init__(*args, **kwargs)
+
+        fullscreen = QShortcut(QKeySequence('F11'), self)
+        fullscreen.activated.connect(lambda: self.showMaximized() if self.isFullScreen() else self.showFullScreen())
 
         settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'text-file')
 
@@ -115,11 +120,27 @@ class MainWindow(BaseWindow):
 
         conf = self.get_widget_tab('gear')
         conf.register_change('dbdir', database_worker.reset)
-        conf.register_change('theme', self.load_qss)
+        conf.register_change('theme', self.apply_theme)
         conf.register_change('workdir', self.get_widget_tab('bar-char').set_workdir)
         conf.register_change('diot-base', self.get_widget_tab('report-3').request_load)
         self.load_qss(conf.get_conf_value('theme'))
         self.header.setFocus()
+
+    def apply_theme(self, theme=None):
+        """Cambia el tema mostrando un indicador: recalcular el estilo de toda la ventana tarda un momento."""
+        overlay = getattr(self, 'theme_loader', None)
+        if overlay is None:
+            overlay = self.theme_loader = QLoadingOverlay(self)
+        overlay.start('Aplicando tema...', immediate=True)
+        QApplication.processEvents()  # pintar el indicador antes de bloquear con setStyleSheet
+
+        def apply():
+            try:
+                self.load_qss(theme)
+            finally:
+                overlay.stop()
+
+        QTimer.singleShot(30, apply)
 
     def get_widget_tab(self, name):
         _, widget = self._tabs[name]

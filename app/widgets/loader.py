@@ -37,10 +37,13 @@ class QLoadingOverlay(QWidget):
             self.setGeometry(self.target.rect())
         return False
 
-    def start(self, message=''):
+    def start(self, message='', immediate=False):
         self.message = message
         self.update()
-        if not self.isVisible() and not self.delay_timer.isActive():
+        if immediate:
+            self.delay_timer.stop()
+            self._show_now()
+        elif not self.isVisible() and not self.delay_timer.isActive():
             self.delay_timer.start(self.SHOW_DELAY_MS)
 
     def stop(self):

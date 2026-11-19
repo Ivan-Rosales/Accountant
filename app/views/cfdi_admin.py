@@ -27,6 +27,9 @@ def money(value) -> str:
     return f'{Decimal(value or 0):,.2f}'
 
 
+CACHE_KEY = 'cfdi-period'
+
+
 class QCfdiAdmin(TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'comprobantes guardados'
@@ -38,10 +41,12 @@ class QCfdiAdmin(TabWidget):
         return getattr(self.parent(), 'client_selector')
 
     def create_ui(self):
-        self.period = QPeriodSelector(self)
+        self.period = QPeriodSelector(self, cache_key=CACHE_KEY)
         self.kind = QClickComboBox(self)
         self.kind.addItem('Egresos', False)
         self.kind.addItem('Ingresos', True)
+        settings.register_setting('cfdi-kind', self.kind.currentIndex, lambda i: self.kind.setCurrentIndex(int(i)), 0,
+                                  signal=self.kind.currentIndexChanged)
 
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(COLUMNS))
@@ -66,8 +71,9 @@ class QCfdiAdmin(TabWidget):
         settings.register_setting(
             'cfdi-check-providers',
             self.prov_check.isChecked,
-            lambda x: self.prov_check.setChecked(x == 'true'),
+            lambda x: self.prov_check.setChecked(x in ('true', True)),
             'false',
+            signal=self.prov_check.toggled,
         )
 
         self.tasks = TaskRunner(self)

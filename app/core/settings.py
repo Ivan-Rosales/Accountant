@@ -42,19 +42,44 @@ class QSettings(QBaseSettings):
         default = default or self.defaults.get(key)
         return super().value(key, default)
 
-    def register_setting(self, key, getter, setter, default=None):
+    def register_setting(self, key, getter, setter, default=None, signal=None):
+        """Recuerda el estado de un widget entre sesiones.
+
+        Si el valor guardado no se puede aplicar (borrado, de otra versión, corrupto) se usa `default`
+        en silencio; si tampoco se puede, el widget se queda como está. Con `signal`, el estado se
+        guarda en cuanto cambia (no solo al cerrar), para no perderlo si la app se cierra mal.
+        """
         self.widgets[key] = (getter, setter)
-        value = self.value(key, default)
-        if value: setter(value)
+        try:
+            value = self.value(key, default)
+        except Exception as error:
+            logger.debug(f'Cached widget {key} could not be read: {error}')
+            value = default
+
+        for candidate in (value, default):
+            if not candidate: continue
+            try:
+                setter(candidate)
+                break
+            except Exception as error:
+                logger.debug(f'Cached widget {key}={candidate!r} could not be applied: {error}')
+
+        if signal is not None:
+            signal.connect(lambda *_: self.save_widget_value(key))
 
         logger.debug(f'Registered widget {key}')
 
-    def set_widget_values(self):
-        for key, (getter, setter) in self.widgets.items():
-            value = getter()
-            self.setValue(key, value)
+    def save_widget_value(self, key):
+        getter, _ = self.widgets.get(key, (None, None))
+        if getter is None: return
+        try:
+            self.setValue(key, getter())
+        except Exception as error:
+            logger.debug(f'Widget {key} could not be cached: {error}')
 
-            logger.debug(f'Register saved widget {key} {value}')
+    def set_widget_values(self):
+        for key in list(self.widgets):
+            self.save_widget_value(key)
 
     def get_workdir(self):
         return Path(str(self.value('workdir')))

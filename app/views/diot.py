@@ -27,6 +27,9 @@ TEXT_FIELDS = {'ID fiscal ext.': 'tax_id', 'Nombre ext.': 'nombre_extranjero', '
                'Jurisdicción': 'jurisdiccion'}
 
 
+CACHE_KEY = 'diot-period'
+
+
 class QDiot(TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'DIOT (carga masiva)'
@@ -41,7 +44,7 @@ class QDiot(TabWidget):
         self.providers: list[diot.DiotProvider] = []
         self._loading = False
 
-        self.period = QPeriodSelector(self)
+        self.period = QPeriodSelector(self, cache_key=CACHE_KEY)
         self.unpaid = []
 
         self.table = QTableWidget(self)

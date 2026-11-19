@@ -109,10 +109,12 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
         self.years.currentIndexChanged.connect(self.reload_data)
 
         func = lambda i: self.years.setCurrentIndex(int(i))
-        settings.register_setting('year-selector', self.years.currentIndex, func)
+        settings.register_setting('year-selector', self.years.currentIndex, func,
+                                  signal=self.years.currentIndexChanged)
 
         func = lambda i: self.months.setCurrentIndex(int(i))
-        settings.register_setting('month-selector', self.months.currentIndex, func)
+        settings.register_setting('month-selector', self.months.currentIndex, func,
+                                  signal=self.months.currentIndexChanged)
 
     def load_ui(self, layout: QGridLayout):
         layout.addItem(spacer, 0, 0, 1, 12)

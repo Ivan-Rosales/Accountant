@@ -28,6 +28,6 @@ if __name__ == "__main__":
     thread.start()
 
     widget = MainWindow()
-    widget.show()
+    widget.showMaximized()  # inicia maximizada; F11 alterna pantalla completa
 
     sys.exit(app.exec())
