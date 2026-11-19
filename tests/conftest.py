@@ -32,12 +32,15 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'value', value)
     monkeypatch.setattr(settings, 'setValue', forbid_write)
     monkeypatch.setattr(database_worker, '_session', None)
+    monkeypatch.setattr(database_worker, '_engine', None)
 
     assert settings.get_workdir().resolve() != REAL_WORKDIR
     yield workdir
 
     if database_worker._session is not None:
         database_worker._session.close()
+    if database_worker._engine is not None:
+        database_worker._engine.dispose()
 
 
 @pytest.fixture

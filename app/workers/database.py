@@ -63,9 +63,13 @@ class DatabaseWorker(QObject):
         super().__init__(*args, **kwargs)
         self.execute.connect(self.on_execute)
         self._session = None
+        self._engine = None
+        self._engine_path = None
 
     def reset(self, *_, **__):
+        if self._session is not None: self._session.close()
         self._session = None
+        self._engine = None
 
         models = self.base.registry.mappers
         for mapper in models:
@@ -73,21 +77,36 @@ class DatabaseWorker(QObject):
             model.all()
 
     @property
-    def session(self):
-        if self._session is None:
-            database_dir = settings.value('dbdir')
-            if database_dir is None:
-                logger.error('Database path is not defined')
-                return None
+    def engine(self):
+        database_dir = settings.value('dbdir')
+        if database_dir is None:
+            logger.error('Database path is not defined')
+            return None
 
+        if self._engine is None or self._engine_path != database_dir:
             Path(database_dir).parent.mkdir(parents=True, exist_ok=True)
-            engine = create_engine(f"sqlite:///{database_dir}", echo=False)
+            # check_same_thread=False: los workers usan sesiones propias sobre el mismo archivo
+            self._engine = create_engine(f"sqlite:///{database_dir}", echo=False,
+                                         connect_args={'check_same_thread': False, 'timeout': 30})
+            self._engine_path = database_dir
             logger.info(f'Database {database_dir}')
-            self.base.metadata.create_all(engine)
+            self.base.metadata.create_all(self._engine)
 
+        return self._engine
+
+    @property
+    def session(self):
+        """Sesión del hilo de la base de datos (la usan los modelos de la interfaz)."""
+        if self._session is None:
+            engine = self.engine
+            if engine is None: return None
             self._session = sessionmaker(bind=engine)()
 
         return self._session
+
+    def new_session(self):
+        """Sesión independiente para usar dentro de un worker (un hilo distinto al de la BD)."""
+        return sessionmaker(bind=self.engine, expire_on_commit=False)()
 
     def on_execute(self, func):
         if not callable(func): return

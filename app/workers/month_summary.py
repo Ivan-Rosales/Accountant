@@ -4,8 +4,7 @@ from typing import List
 from PySide6.QtCore import QObject, Signal
 
 from app.core.excepthook import Log
-from execution.month_summary import MonthSummary
-from execution.month_summary_providers import MonthSummaryProviders
+from execution.month_process import process_folder
 from execution.zip_file import ZipFile
 from exceptions import ValidationException
 from models import Cliente
@@ -45,20 +44,10 @@ class MonthSummaryWorker(QObject):
             for c, path in enumerate(paths, 1):
                 zipfile = ZipFile(path)
                 with zipfile as data_path:
-                    summary = MonthSummary(client)
-                    summary.add_files_in_folder(data_path)
-                    summary.save()
-
-                    if create_providers:
-                        self.progress.emit((c * 2 - 1) / n_files)
-
-                        summary_providers = MonthSummaryProviders(client)
-                        summary_providers.add_files_in_folder(data_path)
-                        summary_providers.save()
-
-                        self.progress.emit(c * 2 / n_files)
-                    else:
-                        self.progress.emit(c / n_files)
+                    result = process_folder(client, data_path, origen=Path(path).name,
+                                            create_providers=create_providers)
+                    summary = result.summary
+                    self.progress.emit(c * (2 if create_providers else 1) / n_files)
 
                 zipfile.mark_processed()
 

@@ -98,13 +98,21 @@ class MonthSummary(WorkbookExecution):
                 f'[{emisor_rfc.upper()}, {receptor_rfc.upper()}]'
             )
 
-    def add_files_in_folder(self, path: Path):
+    @staticmethod
+    def load_folder(path: Path) -> list[XmlFile]:
+        """Lee todos los .xml de la carpeta (y subcarpetas), sin duplicados por UUID, ordenados por fecha."""
         xml_paths = sorted(i for i in path.rglob('*') if i.is_file() and i.suffix.lower() == '.xml')
-        xml_files = [XmlFile(i) for i in xml_paths]
-        xml_files.sort(key=lambda x: x.date)
+        unique = {xml.uuid: xml for xml in (XmlFile(i) for i in xml_paths)}
+        return sorted(unique.values(), key=lambda x: x.date)
 
-        self.xml_files = {i.uuid: i for i in xml_files}
-        self.validate_batch(list(self.xml_files.values()))
+    def add_files_in_folder(self, path: Path):
+        self.add_records(self.load_folder(path))
+
+    def add_records(self, records):
+        """Genera la hoja con CFDI leídos de XML o guardados en la base de datos (misma interfaz)."""
+        records = sorted(records, key=lambda x: (x.date, x.uuid))
+        self.xml_files = {i.uuid: i for i in records}
+        self.validate_batch(records)
         self.process_files()
 
     def validate_batch(self, xml_files):
