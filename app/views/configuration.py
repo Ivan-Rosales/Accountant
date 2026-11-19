@@ -178,6 +178,18 @@ class QConfiguration(TabWidget):
         widget.setProperty('class', 'invalid')
         self.label.show()
 
+        if label == 'theme' and value:
+            self.preview_theme(value)
+            self.label.setText('Vista previa del tema: guarde para conservarlo')
+        else:
+            self.label.setText('Hay cambios sin guardar')
+
+    def preview_theme(self, theme):
+        """Aplica el tema a la ventana sin guardarlo (Guardar lo conserva, Descartar lo revierte)."""
+        window = self.window()
+        if hasattr(window, 'load_qss'):
+            window.load_qss(theme)
+
     def get_value(self, widget):
         if isinstance(widget, QDirSelector):
             return str(widget.get_path())
@@ -229,6 +241,8 @@ class QConfiguration(TabWidget):
 
     def discard_changes(self):
         """Vuelve a los valores guardados sin aplicar nada."""
+        if 'theme' in self.touched:
+            self.preview_theme(settings.value('theme') or self.fields['theme'].get('default'))
         self._reverting = True
         try:
             for label in list(self.touched):
