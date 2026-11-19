@@ -79,8 +79,6 @@ def test_importes_exactos_en_bd(cliente_db, tmp_path):
 def test_proveedores_desde_bd(cliente_db, tmp_path):
     result = process_folder(cliente_db, zip_folder(tmp_path, 'a', [venta(100), venta(50)]), create_providers=True)
     assert result.providers.filename.exists()
-    txt = next((result.providers.filename.parent / 'proveedores').glob('*.txt'))
-    assert len(txt.read_text().splitlines()) == 1  # un proveedor, una sola línea
 
 
 def test_carpeta_sin_xml(cliente_db, tmp_path):
@@ -135,12 +133,14 @@ def test_nominas_y_compras_del_mes_se_juntan(cliente_db, tmp_path):
     assert egresos_rows(cliente_db) == [('JUAN PEREZ', 8500, 0), ('PROVEEDOR', 300, 48)]
 
 
-def test_nominas_no_van_al_txt_de_proveedores(cliente_db, tmp_path):
-    compra = Cfdi(emisor_rfc=PROVEEDOR_RFC, receptor_rfc=CLIENTE_RFC, fecha=ENERO, conceptos=[Concepto(300)])
+def test_nominas_no_van_al_reporte_de_proveedores(cliente_db, tmp_path):
+    compra = Cfdi(emisor_rfc=PROVEEDOR_RFC, receptor_rfc=CLIENTE_RFC, emisor_nombre='Proveedor', fecha=ENERO,
+                  conceptos=[Concepto(300)])
     process_folder(cliente_db, zip_folder(tmp_path, 'n', [nomina()]))
     result = process_folder(cliente_db, zip_folder(tmp_path, 'e', [compra]), create_providers=True)
-    txt = next((result.providers.filename.parent / 'proveedores').glob('*.txt'))
-    assert EMPLEADO_RFC not in txt.read_text()
+    sheet = load_workbook(result.providers.filename)[month_name[1].capitalize()]
+    names = {sheet.cell(r, 2).value for r in range(6, sheet.max_row + 1)}
+    assert 'PROVEEDOR' in names and 'JUAN PEREZ' not in names
 
 
 def test_migracion_agrega_columna_percepciones(tmp_path, monkeypatch):

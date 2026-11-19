@@ -92,3 +92,34 @@ def set_cancelled(session: Session, client: Cliente, uuid: str, cancelled=True) 
     record.cancelado = cancelled
     session.commit()
     return True
+
+
+DIOT_FIELDS = ('tipo_tercero', 'tipo_operacion', 'frontera', 'tax_id', 'nombre_extranjero', 'pais', 'jurisdiccion')
+
+
+def diot_settings(session: Session, client: Cliente) -> dict:
+    from execution.diot import DiotSettings
+    from models import ProveedorDiot
+    rows = session.scalars(select(ProveedorDiot).where(ProveedorDiot.cliente_id == client.id))
+    return {r.rfc: DiotSettings(**{f: getattr(r, f) or '' for f in DIOT_FIELDS}) for r in rows}
+
+
+def save_diot_settings(session: Session, client: Cliente, providers) -> None:
+    """Guarda lo capturado por proveedor para que la próxima DIOT se llene sola."""
+    from models import ProveedorDiot
+    existing = {r.rfc: r for r in session.scalars(select(ProveedorDiot).where(ProveedorDiot.cliente_id == client.id))}
+    for p in providers:
+        row = existing.get(p.rfc) or ProveedorDiot(cliente_id=client.id, rfc=p.rfc)
+        for f in DIOT_FIELDS:
+            setattr(row, f, getattr(p, f) or None)
+        session.add(row)
+    session.commit()
+
+
+def received_records(session: Session, client: Cliente, year: int, month: int) -> list[Comprobante]:
+    """CFDI recibidos (proveedores) del periodo, sin cancelados."""
+    query = select(Comprobante).where(
+        Comprobante.cliente_id == client.id, Comprobante.year == year, Comprobante.month == month,
+        Comprobante.ingreso.is_(False), Comprobante.cancelado.is_(False),
+    ).order_by(Comprobante.fecha)
+    return list(session.scalars(query))

@@ -318,28 +318,3 @@ class MonthSummary(WorkbookExecution):
         self.set_format()
 
         super().save()
-
-
-class RowProviders:
-    def __init__(self, client, xml_files):
-        self.client = client
-        self.xml_files = xml_files
-        self.row = [''] * 7 + ['0'] * 47
-        self.set_data()
-
-    def get_total(self):
-        return sum([i.total for i in self.xml_files])
-
-    def get_total_iva(self):
-        return sum([i.iva for i in self.xml_files])
-
-    def set_data(self):
-        self.row[0] = '04'
-        self.row[1] = '85'
-        self.row[2] = self.client.rfc
-        self.row[11] = self.get_total()
-        self.row[21] = self.get_total_iva()
-        self.row[53] = '01'
-
-    def csv_row(self):
-        return self.row

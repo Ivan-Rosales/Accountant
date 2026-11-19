@@ -1,4 +1,3 @@
-import csv
 from collections import defaultdict
 from decimal import Decimal
 from functools import cached_property
@@ -8,7 +7,6 @@ from openpyxl.styles import Border, Side
 from openpyxl.styles import PatternFill
 
 from execution.month_summary import MonthSummary
-from execution.month_summary import RowProviders
 from execution.xml_file import XmlFile, XmlNode
 from logger import logger
 
@@ -35,6 +33,8 @@ class MonthSummaryProviders(MonthSummary):
 
         if xml.uuid not in self.xml_files:
             self.xml_files[xml.uuid] = xml
+
+        if xml.tipo == 'N': return  # los trabajadores no son proveedores
 
         rfc_related = (xml.receptor.rfc if self.rev else xml.emisor.rfc).upper()
         self.providers[rfc_related].append(xml)
@@ -66,28 +66,5 @@ class MonthSummaryProviders(MonthSummary):
                 cell.border = border
 
     def save(self):
-        self.generate_providers()
+        # El TXT para el SAT ahora se genera desde la pestaña DIOT con el layout oficial
         return super().save()
-
-    def generate_providers(self):
-        providers = defaultdict(list)
-        for xml_file in self.xml_files.values():
-            if xml_file.tipo == 'N': continue  # los trabajadores no son proveedores (DIOT)
-            person: XmlNode = xml_file.receptor if self.rev else xml_file.emisor
-            providers[person].append(xml_file)
-
-        kind = 'ingresos' if self.rev else 'egresos'
-        filename = f'{self.client.rfc} {self.year} {self.month} {kind}'.upper()
-        filename = Path(f'{self.workdir}/{self.client.rfc}/proveedores/{filename}.txt')
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        file = open(filename, 'w', newline='')
-
-        try:
-            writer = csv.writer(file, delimiter='|')
-            for person, xml_files in providers.items():
-                row = RowProviders(person, xml_files)
-                writer.writerow(row.csv_row())
-        finally:
-            file.close()
-
-        logger.info(f'{self.__class__.__name__} providers saved in {self.filename}')

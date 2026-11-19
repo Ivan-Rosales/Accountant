@@ -123,3 +123,20 @@ class Comprobante(DatabaseWorker.base):
 
     def __str__(self):
         return f'{self.uuid} {self.tipo} {self.fecha:%Y-%m-%d} {self.total}'
+
+
+class ProveedorDiot(DatabaseWorker.base):
+    """Datos de la DIOT que el XML no trae, capturados por cliente y proveedor."""
+    __tablename__ = 'diot_proveedor'
+    __table_args__ = (UniqueConstraint('cliente_id', 'rfc', name='uq_diot_cliente_rfc'),)
+
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey('client.id', ondelete='CASCADE'), nullable=False)
+    rfc = Column(String(13), nullable=False)
+    tipo_tercero = Column(String(2))
+    tipo_operacion = Column(String(2))
+    frontera = Column(String(5))
+    tax_id = Column(String(40))
+    nombre_extranjero = Column(String(300))
+    pais = Column(String(3))
+    jurisdiccion = Column(String(300))
