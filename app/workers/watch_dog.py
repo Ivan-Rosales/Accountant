@@ -22,7 +22,7 @@ class WatchdogHandler(FileSystemEventHandler):
         if event.is_directory or event.event_type not in ('created', 'modified', 'deleted', 'moved'):
             return
         for path in (event.src_path, getattr(event, 'dest_path', '')):
-            if path and is_relevant(str(path)):
+            if path and self.worker.relevant(str(path)):
                 # Se emite desde el hilo del observer; Qt lo entrega en cola al hilo de la UI
                 self.worker.change.emit(str(path))
                 return
@@ -33,9 +33,11 @@ class WatchdogWorker(QObject):
     start = Signal()
     change = Signal(str)
 
-    def __init__(self, path=None):
+    def __init__(self, path=None, relevant=is_relevant, recursive=True):
         super().__init__()
         self.path: Path | None = Path(path) if path else None
+        self.relevant = relevant
+        self.recursive = recursive
         self.observer: Observer | None = None
 
     def on_start(self):
@@ -44,13 +46,13 @@ class WatchdogWorker(QObject):
 
         self.path.mkdir(parents=True, exist_ok=True)
         self.observer = Observer()
-        self.observer.schedule(WatchdogHandler(self), str(self.path), recursive=True)
+        self.observer.schedule(WatchdogHandler(self), str(self.path), recursive=self.recursive)
         self.observer.daemon = True
         self.observer.start()
         logger.info(f'Watching {self.path} on change')
 
     def set_path(self, path):
-        self.path = Path(path)
+        self.path = Path(path) if path else None
         self.on_start()
 
     def stop(self):

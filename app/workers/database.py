@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
-from sqlalchemy import create_engine, select, inspect, update
+from sqlalchemy import create_engine, select, inspect, update, event
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -89,6 +89,12 @@ class DatabaseWorker(QObject):
             self._engine = create_engine(f"sqlite:///{database_dir}", echo=False,
                                          connect_args={'check_same_thread': False, 'timeout': 30})
             self._engine_path = database_dir
+
+            @event.listens_for(self._engine, 'connect')
+            def enable_foreign_keys(dbapi_connection, _):
+                # SQLite no aplica ON DELETE CASCADE si no se activa por conexión
+                dbapi_connection.execute('PRAGMA foreign_keys=ON')
+
             logger.info(f'Database {database_dir}')
             self.base.metadata.create_all(self._engine)
             self.add_missing_columns(self._engine)

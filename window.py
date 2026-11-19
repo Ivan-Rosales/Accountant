@@ -9,7 +9,9 @@ from app.core.settings import settings
 from app.views.client_admin import QClientAdmin
 from app.views.cfdi_admin import QCfdiAdmin
 from app.views.configuration import QConfiguration
+from app.views.contacts import QContacts
 from app.views.diot import QDiot
+from app.views.mail import QMail
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
 from app.widgets.animations import fade_in, FAST
@@ -35,6 +37,8 @@ class MainWindow(BaseWindow):
         'report': QCfdiAdmin,
         'report-3': QDiot,
         'user': QClientAdmin,
+        'contacts': QContacts,
+        'mail': QMail,
         'gear': QConfiguration,
     }
     tab_labels = {
@@ -43,6 +47,8 @@ class MainWindow(BaseWindow):
         'report': 'Comprobantes',
         'report-3': 'DIOT',
         'user': 'Clientes',
+        'contacts': 'Contactos',
+        'mail': 'Correos',
         'gear': 'Configuración',
     }
 
@@ -122,6 +128,8 @@ class MainWindow(BaseWindow):
         conf.register_change('dbdir', database_worker.reset)
         conf.register_change('theme', self.apply_theme)
         conf.register_change('workdir', self.get_widget_tab('bar-char').set_workdir)
+        for key in ('mail-watch', 'mail-watchdir'):
+            conf.register_change(key, self.get_widget_tab('mail').apply_watch_settings)
         conf.register_change('diot-base', self.get_widget_tab('report-3').request_load)
         self.load_qss(conf.get_conf_value('theme'))
         self.header.setFocus()

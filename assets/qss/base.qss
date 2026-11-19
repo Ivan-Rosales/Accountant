@@ -96,8 +96,7 @@ QFrame[class~="card"] {
 
 QFrame[class~="card"] QLabel,
 QFrame[class~="card"] QCheckBox,
-QFrame[class~="card"] QRadioButton,
-QFrame[class~="card"] > QWidget {
+QFrame[class~="card"] QRadioButton {
     background-color: transparent;
 }
 
@@ -224,4 +223,12 @@ QFrame[class~="toast"] QLabel {
 
 QLabel[class~="toast-title"] {
     font-weight: 600;
+}
+
+QLabel[class~="notice"] {
+    background-color: rgba(210, 153, 34, 0.12);
+    border: 1px solid rgba(210, 153, 34, 0.45);
+    border-radius: 8px;
+    color: #e3b341;
+    padding: 8px 10px;
 }

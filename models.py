@@ -181,3 +181,44 @@ class PagoDocumento(DatabaseWorker.base):
     @property
     def emisor(self):
         return Party(self.emisor_rfc, self.emisor_nombre)
+
+
+class Contacto(DatabaseWorker.base):
+    """Cliente de mi cliente (a quien mi cliente le factura), identificado por RFC."""
+    __tablename__ = 'contacto'
+    __table_args__ = (UniqueConstraint('cliente_id', 'rfc', name='uq_contacto_cliente_rfc'),)
+
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey('client.id', ondelete='CASCADE'), nullable=False, index=True)
+    rfc = Column(String(13), nullable=False)
+    nombre = Column(String(300))
+
+    def __str__(self):
+        return f'({self.rfc}) {self.nombre or ""}'.strip()
+
+
+class ContactoEmail(DatabaseWorker.base):
+    __tablename__ = 'contacto_email'
+    __table_args__ = (UniqueConstraint('contacto_id', 'email', name='uq_contacto_email'),)
+
+    id = Column(Integer, primary_key=True)
+    contacto_id = Column(Integer, ForeignKey('contacto.id', ondelete='CASCADE'), nullable=False, index=True)
+    email = Column(String(254), nullable=False)
+
+
+class EnvioCorreo(DatabaseWorker.base):
+    """Historial de envíos de facturas por correo (permite reenviar)."""
+    __tablename__ = 'envio_correo'
+
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey('client.id', ondelete='SET NULL'), index=True)
+    contacto_rfc = Column(String(13))
+    contacto_nombre = Column(String(300))
+    uuid = Column(String(36), index=True)
+    xml_path = Column(String(1000), nullable=False)
+    pdf_path = Column(String(1000), nullable=False)
+    destinatarios = Column(String(2000), nullable=False, comment='correos separados por coma')
+    asunto = Column(String(500))
+    fecha = Column(DateTime, default=datetime.now, nullable=False)
+    estado = Column(String(10), nullable=False, comment='enviado / error')
+    error = Column(String(2000))

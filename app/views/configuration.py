@@ -1,18 +1,23 @@
 from functools import cached_property
 
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QWidget, QScrollArea, QFrame
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QWidget, QScrollArea, QFrame, QMessageBox
 
 from app.core.settings import settings
-from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR
+from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR, DEFAULT_MAIL_DIR
 from app.widgets.card import card
 from app.widgets.color_picker import QThemePicker
 from app.widgets.common import QButton
 from app.widgets.file_selector import QDirSelector
 from app.widgets.import_files import QImportWidget
-from app.widgets.option_selector import QOptionSelector
+from app.widgets.option_selector import QOptionSelector, QTextField
 from app.widgets.switch import QSwitchField
 from base.tab import TabWidget
+from execution import mailer
+from execution.mailer import SECURITIES, SECURITY_SSL
+from app.core.tasks import TaskRunner
+from app.widgets.period_selector import show_message
+from app.widgets.toast import toast
 from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from functions import get_icon
 from logger import logger
@@ -33,6 +38,8 @@ class QConfiguration(TabWidget):
         'apariencia': ('Apariencia', ''),
         'rutas': ('Rutas', 'Dónde se guardan los concentrados y la base de datos'),
         'calculo': ('Reglas de cálculo', 'Afectan a los concentrados y la DIOT que se generen a partir de ahora'),
+        'correo': ('Correo', 'Envío de facturas: carpeta vigilada y cuenta SMTP. '
+                             'La contraseña se guarda en el Administrador de credenciales de Windows.'),
     }
 
     fields = {
@@ -80,6 +87,64 @@ class QConfiguration(TabWidget):
             'values': ('01', '02'),
             'default': '01',
         },
+        'mail-watch': {
+            'section': 'correo',
+            'label': 'Vigilancia',
+            'widget': QSwitchField,
+            'text': 'Detectar facturas nuevas en la carpeta (PDF + XML con el mismo nombre)',
+            'values': ('true', 'false'),
+            'default': 'true',
+        },
+        'mail-watchdir': {
+            'section': 'correo',
+            'label': 'Carpeta a vigilar',
+            'widget': QDirSelector,
+            'default': DEFAULT_MAIL_DIR,
+        },
+        'mail-host': {
+            'section': 'correo',
+            'label': 'Servidor SMTP',
+            'widget': QTextField,
+            'placeholder': 'smtp.gmail.com, smtp.office365.com...',
+            'default': '',
+        },
+        'mail-security': {
+            'section': 'correo',
+            'label': 'Seguridad',
+            'widget': QOptionSelector,
+            'options': SECURITIES,
+            'default': SECURITY_SSL,
+        },
+        'mail-port': {
+            'section': 'correo',
+            'label': 'Puerto',
+            'widget': QTextField,
+            'placeholder': '465 (SSL) o 587 (STARTTLS)',
+            'default': '465',
+        },
+        'mail-user': {
+            'section': 'correo',
+            'label': 'Usuario (correo remitente)',
+            'widget': QTextField,
+            'placeholder': 'facturas@despacho.com',
+            'default': '',
+        },
+        'mail-from-name': {
+            'section': 'correo',
+            'label': 'Nombre del remitente',
+            'widget': QTextField,
+            'placeholder': 'Despacho contable',
+            'default': '',
+        },
+        'mail-password': {
+            'section': 'correo',
+            'label': 'Contraseña',
+            'widget': QTextField,
+            'secret': True,
+            'placeholder': 'Contraseña de aplicación',
+            'default': '',
+            'help': 'Con Gmail u Outlook use una contraseña de aplicación. No se guarda en el archivo de configuración.',
+        },
     }
 
     @cached_property
@@ -88,6 +153,7 @@ class QConfiguration(TabWidget):
 
     def create_ui(self):
         self.touched = {}
+        self.tasks = TaskRunner(self)
 
         self.import_widget = QImportWidget(self)
 
@@ -98,12 +164,21 @@ class QConfiguration(TabWidget):
             kwargs = {}
             if widget_class is QOptionSelector: kwargs = {'options': description['options']}
             if widget_class is QSwitchField: kwargs = {'text': description['text'], 'values': description['values']}
+            if widget_class is QTextField:
+                kwargs = {'secret': description.get('secret', False), 'placeholder': description.get('placeholder', '')}
             widget = widget_class(self, **kwargs)
             self.fields[label]['widget'] = widget
-            self.set_value(widget, settings.value(label) or description.get('default'))
+            try:
+                self.set_value(widget, self.stored_value(label))
+            except Exception:  # valor guardado inválido: se usa el default en silencio
+                try:
+                    self.set_value(widget, description.get('default'))
+                except Exception:
+                    pass
             self.set_on_change(label, widget)
 
         self.widgets['dbdir'].with_file('db.sqlite3')
+        self.refresh_password_hint()
 
         self.label_version = QLabel(f'Versión {settings.version}', self)
         self.label_version.setProperty('class', 'secondary')
@@ -147,6 +222,10 @@ class QConfiguration(TabWidget):
                     hint.setWordWrap(True)
                     frame_layout.addWidget(hint)
             content_layout.addWidget(frame)
+
+            if key == 'correo':
+                self.test_mail_btn = QButton('probar conexión', frame, fn=self.test_mail)
+                frame_layout.addWidget(self.test_mail_btn)
 
         frame, frame_layout = card(content, 'Importar', 'Trae los concentrados en Excel del programa anterior')
         frame_layout.addWidget(self.import_widget)
@@ -195,7 +274,7 @@ class QConfiguration(TabWidget):
     def get_value(self, widget):
         if isinstance(widget, QDirSelector):
             return str(widget.get_path())
-        if isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField)):
+        if isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField, QTextField)):
             return widget.get_value()
 
         logger.warning(f'{self.__class__.__name__} is not defined get_value for {widget.__class__.__name__}')
@@ -205,7 +284,7 @@ class QConfiguration(TabWidget):
         if isinstance(widget, QDirSelector):
             widget.setPlaceholderText(value)
             widget.setPath(value)
-        elif isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField)):
+        elif isinstance(widget, (QThemePicker, QOptionSelector, QSwitchField, QTextField)):
             widget.set_value(value)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_value for {widget.__class__.__name__}')
@@ -218,7 +297,7 @@ class QConfiguration(TabWidget):
             widget.changeDir.connect(changed)
         elif isinstance(widget, QThemePicker):
             widget.changeTheme.connect(changed)
-        elif isinstance(widget, (QOptionSelector, QSwitchField)):
+        elif isinstance(widget, (QOptionSelector, QSwitchField, QTextField)):
             widget.changeOption.connect(changed)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_on_change for {widget.__class__.__name__}')
@@ -229,13 +308,38 @@ class QConfiguration(TabWidget):
 
         logger.info(f'{self.__class__.__name__} reset configuration to default')
 
+    def stored_value(self, label):
+        description = self.fields[label]
+        if description.get('secret'):
+            return ''  # las contraseñas nunca se leen de vuelta al campo
+        return settings.value(label) or description.get('default')
+
+    def refresh_password_hint(self):
+        widget = self.widgets.get('mail-password')
+        if widget is None: return
+        try:
+            stored = bool(mailer.get_password(self.get_value(self.widgets['mail-user'])))
+        except Exception:
+            stored = False
+        widget.setPlaceholderText('Guardada (escriba para reemplazarla)' if stored else 'Contraseña de aplicación')
+
     def save_configuration(self):
         for label, value in self.touched.items():
-            settings.setValue(label, value)
-            logger.debug(f'Change configuration {label} to {value}')
+            if self.fields[label].get('secret'):
+                if value:
+                    try:
+                        mailer.set_password(self.get_value(self.widgets['mail-user']), value)
+                    except Exception as error:
+                        show_message(self, f'No se pudo guardar la contraseña en Windows: {error}',
+                                     icon=QMessageBox.Icon.Warning, title='Configuración')
+                self.widgets[label].set_value('')
+            else:
+                settings.setValue(label, value)
+                logger.debug(f'Change configuration {label} to {value}')
             self.change_configuration.emit(label, value)
             self.widgets[label].setProperty('class', None)
 
+        self.refresh_password_hint()
         self.touched.clear()
         self.label.hide()
         self.discard_btn.setEnabled(False)
@@ -249,7 +353,7 @@ class QConfiguration(TabWidget):
         try:
             for label in list(self.touched):
                 description = self.fields[label]
-                self.set_value(description['widget'], settings.value(label) or description.get('default'))
+                self.set_value(description['widget'], self.stored_value(label))
                 self.widgets[label].setProperty('class', None)
         finally:
             self._reverting = False
@@ -267,3 +371,38 @@ class QConfiguration(TabWidget):
             return None
 
         self.change_configuration.connect(wrapper)
+
+    def test_mail(self):
+        """Prueba la conexión con lo capturado (aunque no esté guardado)."""
+        values = {key: self.get_value(self.widgets[key]) for key in
+                  ('mail-host', 'mail-port', 'mail-security', 'mail-user', 'mail-from-name')}
+        try:
+            smtp = mailer.SmtpSettings(host=values['mail-host'], port=int(values['mail-port'] or 0),
+                                       security=values['mail-security'], user=values['mail-user'],
+                                       from_name=values['mail-from-name'])
+            password = self.get_value(self.widgets['mail-password']) or mailer.get_password(smtp.user)
+        except Exception as error:
+            show_message(self, f'Revise los datos: {error}', icon=QMessageBox.Icon.Warning, title='Correo')
+            return
+        if not password:
+            show_message(self, 'Capture la contraseña para probar la conexión.', icon=QMessageBox.Icon.Warning,
+                         title='Correo')
+            return
+
+        self.test_mail_btn.setEnabled(False)
+        self.test_mail_btn.setText('Probando...')
+
+        def finish():
+            self.test_mail_btn.setEnabled(True)
+            self.test_mail_btn.setText('Probar conexión')
+
+        def done(_):
+            finish()
+            toast(self, 'Conexión correcta', detail=f'{smtp.user} en {smtp.host}:{smtp.port}')
+
+        def failed(error):
+            finish()
+            show_message(self, 'No se pudo conectar al servidor de correo.', detail=str(error),
+                         icon=QMessageBox.Icon.Warning, title='Correo')
+
+        self.tasks.run('test-mail', lambda: mailer.test_connection(smtp, password), on_done=done, on_error=failed)

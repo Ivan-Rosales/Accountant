@@ -83,3 +83,33 @@ QPushButton[class~="danger"]:hover {
 QPushButton[class~="danger"]:pressed {
     background-color: #b62324;
 }
+
+/* Selector segmentado (pestañas internas) */
+
+QPushButton[class~="segment"] {
+    background-color: #1e2227;
+    border: 1px solid #30363d;
+    border-radius: 0;
+    padding: 8px 16px;
+    color: #8b949e;
+}
+
+QPushButton[class~="segment"][position~="first"] {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+QPushButton[class~="segment"][position~="last"] {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+QPushButton[class~="segment"]:hover {
+    color: #e6e8eb;
+}
+
+QPushButton[class~="segment"]:checked {
+    background-color: #262b31;
+    border-color: {{color}};
+    color: #ffffff;
+}

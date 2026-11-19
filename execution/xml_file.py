@@ -208,6 +208,14 @@ class XmlFile:
         return self.mxn(to_decimal(node.attrib.get('TotaldeRetenciones')))
 
     @cached_property
+    def serie(self) -> str:
+        return self.attr('Serie', 'serie', default='') or ''
+
+    @cached_property
+    def folio(self) -> str:
+        return self.attr('Folio', 'folio', default='') or ''
+
+    @cached_property
     def metodo_pago(self) -> str | None:
         """PUE (una exhibición) o PPD (parcialidades o diferido). CFDI 3.2 no usa estas claves."""
         value = self.attr('MetodoPago')

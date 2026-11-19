@@ -1,4 +1,4 @@
-"""Notificaciones flotantes (toasts) en la esquina inferior derecha de la ventana.
+"""Notificaciones flotantes (toasts) en la esquina superior derecha, bajo el encabezado.
 
     toast(self, 'Concentrado regenerado', detail=str(path), action=('Abrir', summary.startfile))
 
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushBut
 from app.widgets.message_dialog import QModalIcon, KIND_SUCCESS
 
 MARGIN, GAP, WIDTH = 18, 10, 360
+TOP_OFFSET = 92  # debajo de la barra de título y del selector de cliente (no tapa botones de acción)
 
 
 class QToast(QFrame):
@@ -144,11 +145,10 @@ class ToastManager(QWidget):
         return False
 
     def positions(self):
-        bottom = self.window.height() - MARGIN
-        for toast in reversed(self.toasts):  # el más nuevo abajo
-            bottom -= toast.height()
-            yield toast, QPoint(self.window.width() - WIDTH - MARGIN, bottom)
-            bottom -= GAP
+        top = TOP_OFFSET
+        for toast in reversed(self.toasts):  # el más nuevo arriba
+            yield toast, QPoint(self.window.width() - WIDTH - MARGIN, top)
+            top += toast.height() + GAP
 
     def show_toast(self, *args, **kwargs):
         toast = QToast(self, *args, **kwargs)

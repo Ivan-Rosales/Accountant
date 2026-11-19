@@ -69,3 +69,40 @@ QTableWidget::indicator:checked {
     background-color: {{color}};
     border-color: {{color}};
 }
+
+QListWidget {
+    background-color: #16191d;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 4px;
+    outline: none;
+}
+
+QListWidget::item {
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin: 1px 0;
+}
+
+QListWidget::item:hover {
+    background-color: #262b31;
+}
+
+QListWidget::item:selected {
+    background-color: #2b3138;
+    color: #ffffff;
+    border: 1px solid {{color}};
+}
+
+QListWidget::indicator {
+    background-color: #1e2227;
+    border: 1px solid #4d555f;
+    border-radius: 5px;
+    width: 16px;
+    height: 16px;
+}
+
+QListWidget::indicator:checked {
+    background-color: {{color}};
+    border-color: {{color}};
+}
