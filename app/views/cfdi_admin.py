@@ -10,11 +10,12 @@ from app.core.tasks import TaskRunner
 from app.widgets.common import QButton
 from app.widgets.loader import QLoadingOverlay
 from app.widgets.period_selector import QPeriodSelector, show_message
-from app.widgets.switch import QSwitch, QClickComboBox
+from app.widgets.switch import QSwitch, QClickComboBox, QSwitchField
 from app.workers.database import database_worker
 from base.tab import TabWidget
 from execution import cfdi_store
 from execution.month_summary import MonthSummary, GENERIC_RFCS, PUBLICO_EN_GENERAL
+from execution.month_summary_providers import MonthSummaryProviders
 from logger import logger
 
 TIPOS = {'I': 'Factura', 'E': 'Nota de crédito', 'P': 'Pago', 'N': 'Nómina', 'T': 'Traslado'}
@@ -59,6 +60,15 @@ class QCfdiAdmin(TabWidget):
         self.regenerate_btn.setProperty('class', 'primary')
         self.regenerate_btn.setToolTip('Vuelve a generar la hoja del mes con los comprobantes no cancelados')
 
+        self.prov_check = QSwitchField(self, text='Incluir reporte por proveedor')
+        self.prov_check.setToolTip('Al regenerar, también actualiza el concentrado por proveedor del mes')
+        settings.register_setting(
+            'cfdi-check-providers',
+            self.prov_check.isChecked,
+            lambda x: self.prov_check.setChecked(x == 'true'),
+            'false',
+        )
+
         self.tasks = TaskRunner(self)
         self.loader = QLoadingOverlay(self.table)
 
@@ -77,6 +87,7 @@ class QCfdiAdmin(TabWidget):
 
         bottom = QHBoxLayout()
         bottom.addWidget(self.summary, 1)
+        bottom.addWidget(self.prov_check)
         bottom.addWidget(self.regenerate_btn)
         layout.addLayout(bottom)
 
@@ -169,7 +180,9 @@ class QCfdiAdmin(TabWidget):
         client = self.client_selector.get_current()
         if client is None or self.tasks.is_running('regenerate'): return
         ingreso, year, month = self.kind.currentData(), self.period.year, self.period.month
-        summary = MonthSummary(client, nomina_importe=settings.value('nomina-importe'))
+        nomina_importe = settings.value('nomina-importe')
+        summary = MonthSummary(client, nomina_importe=nomina_importe)
+        providers = MonthSummaryProviders(client, nomina_importe=nomina_importe) if self.prov_check.isChecked() else None
 
         def work():
             with database_worker.new_session() as session:
@@ -177,6 +190,9 @@ class QCfdiAdmin(TabWidget):
             if not records: return None
             summary.add_records(records)
             summary.save()
+            if providers is not None:
+                providers.add_records(records)
+                providers.save()
             return summary
 
         def done(result):
@@ -186,7 +202,8 @@ class QCfdiAdmin(TabWidget):
                              icon=QMessageBox.Icon.Warning, title='Sin comprobantes')
                 return
             self.set_dirty(False)
-            show_message(self, f'Concentrado regenerado:\n{result.filename}', title='Listo')
+            files = f'{result.filename}' + (f'\n{providers.filename}' if providers is not None else '')
+            show_message(self, f'Concentrado regenerado:\n{files}', title='Listo')
 
         def failed(error):
             self.regenerate_btn.setEnabled(True)
