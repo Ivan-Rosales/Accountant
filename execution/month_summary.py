@@ -11,7 +11,7 @@ from base.execution import WorkbookExecution
 from exceptions import ValidationException
 from execution.xml_file import XmlFile
 
-GENERIC_RFCS = {'XAXX010101000', 'XEXX010101000'}
+GENERIC_RFCS = {'XAXX010101000'}  # XEXX (extranjero) conserva el nombre del emisor
 NOMINA_NETO = 'neto'
 NOMINA_PERCEPCIONES = 'percepciones'
 NOMINA_IMPORTES = {NOMINA_NETO: 'Neto pagado', NOMINA_PERCEPCIONES: 'Percepciones'}

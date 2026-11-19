@@ -3,7 +3,7 @@ import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem, QLabel,
-                               QHeaderView, QMessageBox, QCheckBox)
+                               QHeaderView, QMessageBox)
 
 from app.core.settings import settings
 from app.widgets.common import QButton
@@ -24,6 +24,8 @@ TEXT_FIELDS = {'ID fiscal ext.': 'tax_id', 'Nombre ext.': 'nombre_extranjero', '
 class QDiot(TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'DIOT (carga masiva)'
+    page_title = 'DIOT'
+    page_subtitle = 'Proveedores del mes y archivo de carga masiva para el SAT'
 
     @property
     def client_selector(self):
@@ -34,22 +36,14 @@ class QDiot(TabWidget):
         self._loading = False
 
         self.period = QPeriodSelector(self)
-        self.efectos = QCheckBox('Se dio efectos fiscales a los comprobantes', self)
-        self.efectos.setChecked(True)
-
-        self.base = QComboBox(self)
-        self.base.addItem('Pagado (flujo de efectivo)', 'pagado')
-        self.base.addItem('Facturado (fecha de factura)', 'facturado')
-        self.base.setToolTip('Pagado: facturas PUE por su fecha y PPD por la fecha de su complemento de pago.\n'
-                             'Facturado: todas las facturas por su fecha, sin considerar pagos.')
-        settings.register_setting('diot-base', lambda: self.base.currentData(),
-                                  lambda x: self.base.setCurrentIndex(max(0, self.base.findData(x))), 'pagado')
         self.unpaid = []
 
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(COLUMNS))
         self.table.setHorizontalHeaderLabels(COLUMNS)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.itemChanged.connect(self.on_item_changed)
 
@@ -63,14 +57,20 @@ class QDiot(TabWidget):
         self.export_btn.setProperty('class', 'primary')
 
         self.period.changed.connect(self.load_data)
-        self.base.currentIndexChanged.connect(self.load_data)
         self.client_selector.on_change(self.load_data)
+
+    @property
+    def base(self):
+        return settings.value('diot-base') or 'pagado'
+
+    @property
+    def efectos_fiscales(self):
+        return settings.value('diot-efectos') or '01'
 
     def load_ui(self, layout):
         top = QHBoxLayout()
-        top.addWidget(self.period, 2)
-        top.addWidget(self.base, 1)
-        top.addWidget(self.efectos, 1)
+        top.addWidget(self.period, 1)
+        top.addStretch(1)
         layout.addLayout(top)
         layout.addWidget(self.table, 1)
         layout.addWidget(self.note)
@@ -91,7 +91,7 @@ class QDiot(TabWidget):
         self.providers, self.unpaid = [], []
         if client is not None:
             with database_worker.new_session() as session:
-                if self.base.currentData() == 'facturado':
+                if self.base == 'facturado':
                     records = cfdi_store.received_records(session, client, self.period.year, self.period.month)
                 else:
                     records, self.unpaid = cfdi_store.cash_records(session, client, self.period.year,
@@ -101,10 +101,10 @@ class QDiot(TabWidget):
         self.fill_table()
 
     def update_note(self):
-        if self.base.currentData() == 'facturado':
-            text = 'Base facturado: todas las facturas recibidas por su fecha. La DIOT pide lo efectivamente pagado.'
+        if self.base == 'facturado':
+            text = 'Base facturado (se cambia en Configuración): todas las facturas recibidas por su fecha. La DIOT pide lo efectivamente pagado.'
         else:
-            text = 'Base pagado: facturas PUE por su fecha y PPD por la fecha de su complemento de pago.'
+            text = 'Base pagado (se cambia en Configuración): facturas PUE por su fecha y PPD por la fecha de su complemento de pago.'
             if self.unpaid:
                 text += (f' {len(self.unpaid)} factura(s) PPD del mes sin pago registrado no se incluyen '
                          f'(entrarán en el mes en que llegue su complemento de pago).')
@@ -143,6 +143,9 @@ class QDiot(TabWidget):
                 self.table.setItem(row, COL[column], item)
 
             self.update_status(row)
+        for column, width in (('Tercero', 120), ('Operación', 250), ('Frontera', 90)):
+            self.table.horizontalHeader().setSectionResizeMode(COL[column], QHeaderView.ResizeMode.Interactive)
+            self.table.setColumnWidth(COL[column], width)
         self._loading = False
 
     def set_text(self, row, column, text, number=False):
@@ -210,7 +213,7 @@ class QDiot(TabWidget):
 
         path = diot.default_filename(settings.get_workdir(), client.rfc, self.period.year, self.period.month)
         try:
-            diot.export(path, self.providers, self.period.year, '01' if self.efectos.isChecked() else '02')
+            diot.export(path, self.providers, self.period.year, self.efectos_fiscales)
         except ValueError as error:
             text, _, detail = str(error).partition('\n')
             show_message(self, text, detail, icon=QMessageBox.Icon.Warning, title='DIOT con errores')

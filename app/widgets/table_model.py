@@ -23,6 +23,7 @@ class QTableModel(ModelMixin, BaseWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
         self.initial_resize = False
 

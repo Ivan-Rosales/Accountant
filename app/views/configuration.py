@@ -1,42 +1,83 @@
 from functools import cached_property
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QVBoxLayout, QGridLayout, QLabel, QWidget
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QWidget, QScrollArea, QFrame
 
 from app.core.settings import settings
 from app.settings import DEFAULT_THEME, DEFAULT_WORK_DIR, DEFAULT_DATABASE_DIR
+from app.widgets.card import card
 from app.widgets.color_picker import QThemePicker
-from app.widgets.common import QButton, spacer
+from app.widgets.common import QButton
 from app.widgets.file_selector import QDirSelector
 from app.widgets.import_files import QImportWidget
+from app.widgets.option_selector import QOptionSelector
 from base.tab import TabWidget
+from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from functions import get_icon
 from logger import logger
+
+DIOT_BASES = {'pagado': 'Pagado (flujo de efectivo)', 'facturado': 'Facturado (fecha de factura)'}
+DIOT_EFECTOS = {'01': 'Sí', '02': 'No'}
 
 
 class QConfiguration(TabWidget):
     change_configuration = Signal(str, object)
-    layout_class = QGridLayout
-    touched = {}
+    layout_class = QVBoxLayout
 
     tooltip_label = 'configuración'
+    page_title = 'Configuración'
+    page_subtitle = 'Apariencia, rutas y reglas de cálculo'
+
+    sections = {
+        'apariencia': ('Apariencia', ''),
+        'rutas': ('Rutas', 'Dónde se guardan los concentrados y la base de datos'),
+        'calculo': ('Reglas de cálculo', 'Afectan a los concentrados y la DIOT que se generen a partir de ahora'),
+    }
 
     fields = {
         'theme': {
-            'label': 'tema',
+            'section': 'apariencia',
+            'label': 'Color del tema',
             'widget': QThemePicker,
             'default': DEFAULT_THEME,
         },
         'workdir': {
-            'label': 'ruta de trabajo',
+            'section': 'rutas',
+            'label': 'Carpeta de concentrados',
             'widget': QDirSelector,
             'default': DEFAULT_WORK_DIR,
         },
         'dbdir': {
-            'label': 'ruta de base de datos',
+            'section': 'rutas',
+            'label': 'Base de datos',
             'widget': QDirSelector,
             'default': DEFAULT_DATABASE_DIR,
-        }
+        },
+        'nomina-importe': {
+            'section': 'calculo',
+            'label': 'Nóminas en egresos',
+            'widget': QOptionSelector,
+            'options': NOMINA_IMPORTES,
+            'default': NOMINA_NETO,
+            'help': 'Neto pagado: total del recibo (como el programa anterior). '
+                    'Percepciones: sueldo bruto antes de ISR retenido, IMSS y otras deducciones.',
+        },
+        'diot-base': {
+            'section': 'calculo',
+            'label': 'Base de la DIOT',
+            'widget': QOptionSelector,
+            'options': DIOT_BASES,
+            'default': 'pagado',
+            'help': 'Pagado: facturas PUE por su fecha y PPD por la fecha de su complemento de pago. '
+                    'Facturado: todas las facturas por su fecha.',
+        },
+        'diot-efectos': {
+            'section': 'calculo',
+            'label': 'DIOT: se dio efectos fiscales a los comprobantes (campo 54)',
+            'widget': QOptionSelector,
+            'options': DIOT_EFECTOS,
+            'default': '01',
+        },
     }
 
     @cached_property
@@ -44,58 +85,80 @@ class QConfiguration(TabWidget):
         return {label: desc['widget'] for label, desc in self.fields.items() if desc.get('widget')}
 
     def create_ui(self):
-        self.special_actions = QWidget()
-        self.special_actions.setFixedHeight(60)
-        self.special_actions_layout = QVBoxLayout()
-        self.special_actions_layout.setContentsMargins(4, 4, 4, 4)
-        self.special_actions.setProperty('class', 'border')
-        self.special_actions.setLayout(self.special_actions_layout)
+        self.touched = {}
 
         self.import_widget = QImportWidget(self)
-        self.special_actions_layout.addWidget(self.import_widget)
 
         for label, description in self.fields.items():
-            widget_class = description.get('widget')
-            widget = widget_class(self) if widget_class else None
+            widget_class = description['widget']
+            if isinstance(widget_class, QWidget):  # ya instanciado por otra ventana
+                widget_class = type(widget_class)
+            kwargs = {'options': description['options']} if widget_class is QOptionSelector else {}
+            widget = widget_class(self, **kwargs)
             self.fields[label]['widget'] = widget
-            self.set_value(widget, settings.value(label))
+            self.set_value(widget, settings.value(label) or description.get('default'))
             self.set_on_change(label, widget)
 
         self.widgets['dbdir'].with_file('db.sqlite3')
 
-        self.label_version = QLabel(f'version {settings.version}'.capitalize(), self)
+        self.label_version = QLabel(f'Versión {settings.version}', self)
         self.label_version.setProperty('class', 'secondary')
 
-        self.label = QLabel('hay cambios sin guardar'.capitalize(), self)
+        self.label = QLabel('Hay cambios sin guardar', self)
         self.label.setProperty('class', 'invalid')
         self.label.hide()
 
-        self.save_btn = QButton('guardar'.capitalize(), self, fn=self.save_configuration)
+        self.save_btn = QButton('guardar', self, fn=self.save_configuration)
         self.save_btn.setProperty('class', 'primary')
 
         self.reset_btn = QButton(get_icon('recurring'), self, fn=self.reset_configuration, icon_opacity=0.5)
-        self.reset_btn.setToolTip('regresar a la configuración por defecto'.capitalize())
+        self.reset_btn.setToolTip('Regresar a la configuración por defecto')
         self.reset_btn.setProperty('type', 'flat')
 
-    def load_ui(self, layout: QGridLayout):
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 0)
+    def load_ui(self, layout: QVBoxLayout):
+        content = QWidget(self)
+        content.setObjectName('ScrollContent')
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 8, 0)
+        content_layout.setSpacing(12)
 
-        fields_layout = QVBoxLayout()
-        for label, description in self.fields.items():
-            field_label = description.get('label', label)
-            fields_layout.addWidget(QLabel(field_label.capitalize(), self))
+        for key, (title, subtitle) in self.sections.items():
+            frame, frame_layout = card(content, title, subtitle)
+            for label, description in self.fields.items():
+                if description['section'] != key: continue
+                caption = QLabel(description['label'], frame)
+                caption.setProperty('class', 'field-label')
+                frame_layout.addWidget(caption)
+                widget = description['widget']
+                if help_text := description.get('help'):
+                    widget.setToolTip(help_text)
+                frame_layout.addWidget(widget)
+                if help_text:
+                    hint = QLabel(help_text, frame)
+                    hint.setProperty('class', 'secondary')
+                    hint.setWordWrap(True)
+                    frame_layout.addWidget(hint)
+            content_layout.addWidget(frame)
 
-            widget = description['widget']
-            fields_layout.addWidget(widget)
-        fields_layout.addWidget(self.label)
-        fields_layout.addItem(spacer)
+        frame, frame_layout = card(content, 'Importar', 'Trae los concentrados en Excel del programa anterior')
+        frame_layout.addWidget(self.import_widget)
+        content_layout.addWidget(frame)
+        content_layout.addStretch(1)
 
-        layout.addWidget(self.special_actions, 0, 0, 1, 2)
-        layout.addLayout(fields_layout, 1, 0, 1, 2)
-        layout.addWidget(self.label_version, 2, 0, 1, 2)
-        layout.addWidget(self.save_btn, 3, 0)
-        layout.addWidget(self.reset_btn, 3, 1)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
+
+        footer = QHBoxLayout()
+        footer.addWidget(self.label_version)
+        footer.addWidget(self.label)
+        footer.addStretch(1)
+        footer.addWidget(self.reset_btn)
+        footer.addWidget(self.save_btn)
+        layout.addLayout(footer)
 
     def on_change(self, label, value):
         self.touched[label] = value
@@ -105,40 +168,39 @@ class QConfiguration(TabWidget):
         self.label.show()
 
     def get_value(self, widget):
-        logger.debug(f'Getting configuration {widget.__class__.__name__}')
-
         if isinstance(widget, QDirSelector):
             return str(widget.get_path())
-        elif isinstance(widget, QThemePicker):
+        if isinstance(widget, (QThemePicker, QOptionSelector)):
             return widget.get_value()
 
         logger.warning(f'{self.__class__.__name__} is not defined get_value for {widget.__class__.__name__}')
         return None
 
     def set_value(self, widget, value):
-        logger.debug(f'Setting configuration {widget.__class__.__name__} with value {value}')
-
         if isinstance(widget, QDirSelector):
             widget.setPlaceholderText(value)
             widget.setPath(value)
-        elif isinstance(widget, QThemePicker):
+        elif isinstance(widget, (QThemePicker, QOptionSelector)):
             widget.set_value(value)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_value for {widget.__class__.__name__}')
 
     def set_on_change(self, label, widget):
+        def changed(*_, l=label, w=widget):
+            self.on_change(l, self.get_value(w))
+
         if isinstance(widget, QDirSelector):
-            widget.changeDir.connect(lambda *args, l=label, **kwargs: self.on_change(l, self.get_value(widget)))
+            widget.changeDir.connect(changed)
         elif isinstance(widget, QThemePicker):
-            widget.changeTheme.connect(lambda *args, l=label, **kwargs: self.on_change(l, self.get_value(widget)))
+            widget.changeTheme.connect(changed)
+        elif isinstance(widget, QOptionSelector):
+            widget.changeOption.connect(changed)
         else:
             logger.warning(f'{self.__class__.__name__} is not defined set_on_change for {widget.__class__.__name__}')
 
     def reset_configuration(self):
         for label, description in self.fields.items():
-            widget = description.get('widget')
-            default_value = description.get('default')
-            self.set_value(widget, default_value)
+            self.set_value(description.get('widget'), description.get('default'))
 
         logger.info(f'{self.__class__.__name__} reset configuration to default')
 
@@ -147,12 +209,11 @@ class QConfiguration(TabWidget):
             settings.setValue(label, value)
             logger.debug(f'Change configuration {label} to {value}')
             self.change_configuration.emit(label, value)
+            self.widgets[label].setProperty('class', None)
 
-            widget = self.widgets[label]
-            widget.setProperty('class', None)
-            self.label.hide()
-
-        logger.debug(f'Configuration saved')
+        self.touched.clear()
+        self.label.hide()
+        logger.debug('Configuration saved')
 
     def get_conf_value(self, label):
         return self.get_value(self.widgets[label])

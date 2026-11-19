@@ -1,53 +1,54 @@
 QPushButton {
-    background-color: #6c757d;
-    border: 1px solid #6c757d;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-weight: bold;
+    background-color: #262b31;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
 }
 
 QPushButton:hover {
-    background-color: #5c636a;
-    border: 1px solid #4F575C;
+    background-color: #2f353c;
+    border: 1px solid #3d444d;
 }
 
 QPushButton:pressed {
-    background-color: #4F575C;
-    border: 1px solid #51585e;
+    background-color: #1e2227;
 }
 
 QPushButton:disabled {
-    background-color: #4c555d;
-    border: 1px solid #4c555d;
+    background-color: #1e2227;
+    border: 1px solid #262b31;
+    color: #5c636a;
 }
 
-/* Flat button */
+/* Botón plano */
 
 QPushButton[type~="flat"] {
     background-color: transparent;
-    color: #6c757d;
+    border: 1px solid transparent;
+    color: #8b949e;
 }
 
 QPushButton[type~="flat"]:hover {
-    background-color: #5c636a;
-    color: {{text}};
+    background-color: #262b31;
+    color: #e6e8eb;
 }
 
 QPushButton[type~="flat"]:pressed {
-    background-color: #4F575C;
-    border: 1px solid #51585e;
+    background-color: #1e2227;
 }
 
 QPushButton[type~="flat"]:disabled {
-    background-color: #4c555d;
-    border: 1px solid #4c555d;
+    background-color: transparent;
+    color: #5c636a;
 }
 
-/* Primary button */
+/* Botón principal */
 
 QPushButton[class~="primary"] {
     background-color: {{color}};
     border: 1px solid {{color}};
+    color: {{text}};
 }
 
 QPushButton[class~="primary"]:hover {
@@ -63,4 +64,5 @@ QPushButton[class~="primary"]:pressed {
 QPushButton[class~="primary"]:disabled {
     background-color: {{color}};
     border: 1px solid {{color}};
+    color: {{text}};
 }

@@ -15,7 +15,7 @@ from execution import cfdi_store
 from execution.month_summary import MonthSummary, GENERIC_RFCS, PUBLICO_EN_GENERAL
 from logger import logger
 
-TIPOS = {'I': 'Ingreso', 'E': 'Nota de crédito', 'P': 'Pago', 'N': 'Nómina', 'T': 'Traslado'}
+TIPOS = {'I': 'Factura', 'E': 'Nota de crédito', 'P': 'Pago', 'N': 'Nómina', 'T': 'Traslado'}
 COLUMNS = ['Cancelado', 'Fecha', 'Tipo', 'RFC', 'Nombre', 'Total', 'IVA', 'Moneda', 'Origen']
 
 
@@ -26,6 +26,8 @@ def money(value) -> str:
 class QCfdiAdmin(TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'comprobantes guardados'
+    page_title = 'Comprobantes'
+    page_subtitle = 'Facturas guardadas por mes: marque las canceladas y regenere el concentrado'
 
     @property
     def client_selector(self):
@@ -43,6 +45,8 @@ class QCfdiAdmin(TabWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.table.itemChanged.connect(self.on_item_changed)

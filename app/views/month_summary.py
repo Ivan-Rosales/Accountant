@@ -1,39 +1,40 @@
-from exceptions import ValidationException
-from PySide6.QtWidgets import QVBoxLayout, QCheckBox, QComboBox, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QVBoxLayout, QCheckBox, QHBoxLayout, QLabel
 
 from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
-from app.widgets.common import spacer, QProgressButton
+from app.widgets.card import card
+from app.widgets.common import QProgressButton
 from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
 from app.workers.month_summary import MonthSummaryWorker
-from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from base.tab import TabWidget
+from exceptions import ValidationException
+from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from logger import logger
 
 
 class QMonthSummary(AsyncExecutionMixin, TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'concentrado mensual'
+    page_title = 'Concentrado mensual'
+    page_subtitle = 'Genera el concentrado de ingresos o egresos a partir de los ZIP de facturas del SAT'
 
     worker_class = MonthSummaryWorker
 
     def create_ui(self):
         self.selector = QFilesSelector(self, filter="*.zip")
-        self.prov_check = QCheckBox('Proveedores', self)
+        self.selector.setProperty('class', 'dropzone')
+        self.prov_check = QCheckBox('Generar también el reporte por proveedor', self)
 
-        # Importe con el que las nóminas que paga el cliente entran a sus egresos
-        self.nomina_label = QLabel('Nóminas en egresos', self)
-        self.nomina_combo = QComboBox(self)
-        for key, label in NOMINA_IMPORTES.items():
-            self.nomina_combo.addItem(label, key)
-        self.nomina_combo.setToolTip('Neto pagado: total del recibo (como el programa anterior).\n'
-                                     'Percepciones: sueldo bruto antes de ISR retenido, IMSS y otras deducciones.')
+        self.rules = QLabel(self)
+        self.rules.setProperty('class', 'secondary')
+        self.rules.setWordWrap(True)
 
         self.metrics = QMetrics(self)
-        self.execute_btn = QProgressButton('ejecutar', self, fn=self.start_worker)
+        self.execute_btn = QProgressButton('generar concentrado', self, fn=self.start_worker)
         self.execute_btn.setProperty('class', 'primary')
+        self.execute_btn.setMinimumHeight(40)
 
         settings.register_setting(
             'check-providers',
@@ -42,26 +43,23 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
             'false',
         )
 
-        settings.register_setting(
-            'nomina-importe',
-            lambda: self.nomina_combo.currentData(),
-            lambda x: self.nomina_combo.setCurrentIndex(max(0, self.nomina_combo.findData(x))),
-            NOMINA_NETO,
-        )
-
     def load_ui(self, layout):
-        layout.addItem(spacer)
-        layout.addWidget(self.selector)
-        layout.addWidget(self.prov_check)
+        frame, frame_layout = card(self, 'Archivos', 'Uno o varios ZIP descargados del SAT; uno por mes y tipo')
+        frame_layout.addWidget(self.selector)
+        frame_layout.addWidget(self.prov_check)
+        frame_layout.addWidget(self.rules)
+        layout.addWidget(frame)
+        layout.addStretch(1)
 
-        nomina_layout = QHBoxLayout()
-        nomina_layout.addWidget(self.nomina_label)
-        nomina_layout.addWidget(self.nomina_combo, 1)
-        layout.addLayout(nomina_layout)
-        layout.addItem(spacer)
+        footer = QHBoxLayout()
+        footer.addWidget(self.metrics, 1)
+        footer.addWidget(self.execute_btn, 2)
+        layout.addLayout(footer)
 
-        layout.addWidget(self.metrics)
-        layout.addWidget(self.execute_btn)
+    def showEvent(self, event):
+        super().showEvent(event)
+        importe = NOMINA_IMPORTES.get(settings.value('nomina-importe') or NOMINA_NETO)
+        self.rules.setText(f'Nóminas en egresos: {importe.lower()}. Se cambia en Configuración.')
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()
@@ -73,7 +71,7 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
 
         params = {
             'create_providers': self.prov_check.isChecked(),
-            'nomina_importe': self.nomina_combo.currentData(),
+            'nomina_importe': settings.value('nomina-importe') or NOMINA_NETO,
         }
 
         return paths, client, params

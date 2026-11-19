@@ -24,6 +24,8 @@ from logger import logger
 class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
     layout_class = QGridLayout
     tooltip_label = 'concentrado anual'
+    page_title = 'Concentrado anual'
+    page_subtitle = 'Meses generados del año y cálculo del IVA mensual y bimestral'
 
     worker_class = YearSummaryWorker
     RELOAD_DELAY_MS = 700
@@ -93,8 +95,9 @@ class QYearSummary(PropertyMixin, AsyncExecutionMixin, TabWidget):
         self.months.addItems([month_name[i].capitalize() for i in range(1, 13)])
         self.months.setCurrentIndex(now.month - 1)
 
-        self.execute_btn = QProgressButton('ejecutar', self, fn=self.start_worker)
+        self.execute_btn = QProgressButton('generar concentrado anual', self, fn=self.start_worker)
         self.execute_btn.setProperty('class', 'primary')
+        self.execute_btn.setMinimumHeight(40)
 
         self.client_selector.on_change(self.load_data)
         self.years.currentIndexChanged.connect(self.reload_data)
