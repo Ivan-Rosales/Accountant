@@ -57,6 +57,23 @@ class Concepto:
 
 
 @dataclass
+class DoctoPagado:
+    uuid: str
+    imp_pagado: Decimal
+    bases: dict = field(default_factory=dict)  # {'0.160000': base}
+    moneda: str = 'MXN'
+    equivalencia: str = '1'
+
+
+@dataclass
+class Pago:
+    fecha: datetime
+    documentos: list
+    moneda: str = 'MXN'
+    tipo_cambio: str = '1'
+
+
+@dataclass
 class Cfdi:
     emisor_rfc: str
     receptor_rfc: str
@@ -70,6 +87,9 @@ class Cfdi:
     moneda: str = 'MXN'
     tipo_cambio: Decimal | None = None
     uuid: str = field(default_factory=lambda: str(uuid_lib.uuid4()).upper())
+    metodo_pago: str | None = None  # 'PUE' / 'PPD'
+    pagos: list = field(default_factory=list)  # para tipo P: list[Pago]
+    pagos_version: str = '2.0'
 
     # ---- cálculos -------------------------------------------------------
     @property
@@ -186,7 +206,7 @@ class Cfdi:
             SubTotal=money(0 if is_pago else self.subtotal),
             Descuento=money(self.descuento) if self.descuento else None,
             Moneda=moneda, TipoCambio=self.tipo_cambio, Total=money(self.total),
-            TipoDeComprobante=self.tipo, LugarExpedicion='01000',
+            TipoDeComprobante=self.tipo, MetodoPago=self.metodo_pago, LugarExpedicion='01000',
             Exportacion='01' if v4 else None,
         )
         return (
@@ -196,10 +216,37 @@ class Cfdi:
             f'<cfdi:Receptor {self._attrs(Rfc=self.receptor_rfc, Nombre=self.receptor_nombre, **receptor_extra)}/>'
             f'<cfdi:Conceptos>{conceptos}</cfdi:Conceptos>'
             f'{impuestos}'
-            f'<cfdi:Complemento>{self._nomina()}<tfd:TimbreFiscalDigital Version="1.1" UUID="{self.uuid}" '
+            f'<cfdi:Complemento>{self._nomina()}{self._pagos()}<tfd:TimbreFiscalDigital Version="1.1" UUID="{self.uuid}" '
             f'FechaTimbrado="{self.fecha.strftime("%Y-%m-%dT%H:%M:%S")}"/></cfdi:Complemento>'
             '</cfdi:Comprobante>'
         )
+
+    def _pagos(self):
+        """Complemento de pagos 2.0 (con ImpuestosDR) o 1.0 (sin desglose)."""
+        if self.tipo != 'P' or not self.pagos: return ''
+        v2 = self.pagos_version == '2.0'
+        prefix, uri = ('pago20', 'http://www.sat.gob.mx/Pagos20') if v2 else ('pago10', 'http://www.sat.gob.mx/Pagos')
+        body = ''
+        for pago in self.pagos:
+            docs = ''
+            for d in pago.documentos:
+                attrs = {'IdDocumento': d.uuid, 'MonedaDR': d.moneda, 'NumParcialidad': '1',
+                         'ImpSaldoAnt': money(d.imp_pagado), 'ImpPagado': money(d.imp_pagado), 'ImpSaldoInsoluto': '0.00'}
+                impuestos = ''
+                if v2:
+                    attrs |= {'EquivalenciaDR': d.equivalencia, 'ObjetoImpDR': '02'}
+                    tras = ''.join(f'<{prefix}:TrasladoDR BaseDR="{money(b)}" ImpuestoDR="002" TipoFactorDR="Tasa" '
+                                   f'TasaOCuotaDR="{t}" ImporteDR="{money(b * Decimal(t))}"/>' for t, b in d.bases.items())
+                    impuestos = f'<{prefix}:ImpuestosDR><{prefix}:TrasladosDR>{tras}</{prefix}:TrasladosDR></{prefix}:ImpuestosDR>'
+                elif d.moneda != 'MXN':
+                    attrs['TipoCambioDR'] = d.equivalencia
+                docs += f'<{prefix}:DoctoRelacionado {self._attrs(**attrs)}>{impuestos}</{prefix}:DoctoRelacionado>'
+            p_attrs = {'FechaPago': pago.fecha.strftime('%Y-%m-%dT%H:%M:%S'), 'FormaDePagoP': '03', 'MonedaP': pago.moneda,
+                       'Monto': money(sum(d.imp_pagado for d in pago.documentos))}
+            if v2: p_attrs['TipoCambioP'] = pago.tipo_cambio
+            elif pago.moneda != 'MXN': p_attrs['TipoCambioP'] = pago.tipo_cambio
+            body += f'<{prefix}:Pago {self._attrs(**p_attrs)}>{docs}</{prefix}:Pago>'
+        return f'<{prefix}:Pagos xmlns:{prefix}="{uri}" Version="{self.pagos_version}">{body}</{prefix}:Pagos>'
 
     def _nomina(self):
         """Complemento de nómina 1.2: percepciones = importe del concepto, deducciones = descuento."""

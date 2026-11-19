@@ -29,7 +29,7 @@ def process_folder(client: Cliente, folder: Path, origen: str | None = None,
 
     checker = MonthSummary(client)
     checker.validate_batch(xml_files)
-    no_nomina = [x for x in xml_files if x.tipo != 'N']
+    no_nomina = [x for x in xml_files if x.tipo not in ('N', 'P')]
     reference = (no_nomina or xml_files)[0]
     year, month = reference.date.year, reference.date.month
     ingreso = checker.detect_rev(xml_files)

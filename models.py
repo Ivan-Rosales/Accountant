@@ -104,6 +104,7 @@ class Comprobante(DatabaseWorker.base):
     base_exento = Column(Money)
     base_no_objeto = Column(Money)
     percepciones = Column(Money, comment='nómina: percepciones brutas')
+    metodo_pago = Column(String(3), comment='PUE o PPD')
 
     cancelado = Column(Boolean, nullable=False, default=False)
     origen = Column(String(300), comment='archivo ZIP del que se importó')
@@ -140,3 +141,42 @@ class ProveedorDiot(DatabaseWorker.base):
     nombre_extranjero = Column(String(300))
     pais = Column(String(3))
     jurisdiccion = Column(String(300))
+
+
+class PagoDocumento(DatabaseWorker.base):
+    """Pago aplicado a un documento, tomado del complemento de pagos (REP). Importes en pesos.
+
+    Misma interfaz que Comprobante para la DIOT: tipo 'I', emisor, base_tasa16..., ret_iva, ret_isr.
+    """
+    __tablename__ = 'cfdi_pago'
+    __table_args__ = (Index('ix_pago_periodo', 'cliente_id', 'year', 'month', 'ingreso'),)
+
+    id = Column(Integer, primary_key=True)
+    cliente_id = Column(Integer, ForeignKey('client.id', ondelete='CASCADE'), nullable=False)
+    pago_uuid = Column(String(36), nullable=False, index=True, comment='UUID del CFDI de pago')
+    documento_uuid = Column(String(36), nullable=False, index=True, comment='UUID de la factura pagada')
+    ingreso = Column(Boolean, nullable=False)
+    fecha_pago = Column(DateTime, nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    emisor_rfc = Column(String(13))
+    emisor_nombre = Column(String(300))
+
+    imp_pagado = Column(Money, nullable=False)
+    con_impuestos = Column(Boolean, nullable=False, default=False, comment='trae ImpuestosDR (Pagos 2.0)')
+    base_tasa16 = Column(Money)
+    base_tasa8 = Column(Money)
+    base_tasa0 = Column(Money)
+    base_exento = Column(Money)
+    base_no_objeto = Column(Money)
+    iva = Column(Money)
+    ret_iva = Column(Money)
+    ret_isr = Column(Money)
+
+    tipo = 'I'
+    cancelado = False
+    aviso = None
+
+    @property
+    def emisor(self):
+        return Party(self.emisor_rfc, self.emisor_nombre)

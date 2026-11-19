@@ -126,7 +126,8 @@ class MonthSummary(WorkbookExecution):
         for xml in xml_files:
             self.validate_file(xml)
 
-        relevant = [i for i in xml_files if i.tipo != 'N']
+        # Nóminas y pagos (REP) pueden ser de otro mes: no definen el periodo del concentrado
+        relevant = [i for i in xml_files if i.tipo not in ('N', 'P')]
         months = sorted({(i.date.year, i.date.month) for i in relevant})
         if len(months) > 1:
             labels = ', '.join(f'{month_name[m].capitalize()} {y}' for y, m in months)

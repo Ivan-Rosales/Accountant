@@ -37,6 +37,15 @@ class QDiot(TabWidget):
         self.efectos = QCheckBox('Se dio efectos fiscales a los comprobantes', self)
         self.efectos.setChecked(True)
 
+        self.base = QComboBox(self)
+        self.base.addItem('Pagado (flujo de efectivo)', 'pagado')
+        self.base.addItem('Facturado (fecha de factura)', 'facturado')
+        self.base.setToolTip('Pagado: facturas PUE por su fecha y PPD por la fecha de su complemento de pago.\n'
+                             'Facturado: todas las facturas por su fecha, sin considerar pagos.')
+        settings.register_setting('diot-base', lambda: self.base.currentData(),
+                                  lambda x: self.base.setCurrentIndex(max(0, self.base.findData(x))), 'pagado')
+        self.unpaid = []
+
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(COLUMNS))
         self.table.setHorizontalHeaderLabels(COLUMNS)
@@ -44,8 +53,7 @@ class QDiot(TabWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.itemChanged.connect(self.on_item_changed)
 
-        self.note = QLabel('Calculado con la fecha de las facturas recibidas del mes. Revise las facturas PPD: '
-                           'la DIOT pide lo efectivamente pagado.', self)
+        self.note = QLabel(self)
         self.note.setWordWrap(True)
         self.note.setProperty('class', 'secondary')
 
@@ -55,11 +63,13 @@ class QDiot(TabWidget):
         self.export_btn.setProperty('class', 'primary')
 
         self.period.changed.connect(self.load_data)
+        self.base.currentIndexChanged.connect(self.load_data)
         self.client_selector.on_change(self.load_data)
 
     def load_ui(self, layout):
         top = QHBoxLayout()
         top.addWidget(self.period, 2)
+        top.addWidget(self.base, 1)
         top.addWidget(self.efectos, 1)
         layout.addLayout(top)
         layout.addWidget(self.table, 1)
@@ -78,12 +88,29 @@ class QDiot(TabWidget):
     # ---- datos ----------------------------------------------------------------
     def load_data(self, *_):
         client = self.client_selector.get_current()
-        self.providers = []
+        self.providers, self.unpaid = [], []
         if client is not None:
             with database_worker.new_session() as session:
-                records = cfdi_store.received_records(session, client, self.period.year, self.period.month)
+                if self.base.currentData() == 'facturado':
+                    records = cfdi_store.received_records(session, client, self.period.year, self.period.month)
+                else:
+                    records, self.unpaid = cfdi_store.cash_records(session, client, self.period.year,
+                                                                   self.period.month)
                 self.providers = diot.aggregate(records, cfdi_store.diot_settings(session, client))
+        self.update_note()
         self.fill_table()
+
+    def update_note(self):
+        if self.base.currentData() == 'facturado':
+            text = 'Base facturado: todas las facturas recibidas por su fecha. La DIOT pide lo efectivamente pagado.'
+        else:
+            text = 'Base pagado: facturas PUE por su fecha y PPD por la fecha de su complemento de pago.'
+            if self.unpaid:
+                text += (f' {len(self.unpaid)} factura(s) PPD del mes sin pago registrado no se incluyen '
+                         f'(entrarán en el mes en que llegue su complemento de pago).')
+        self.note.setText(text)
+        self.note.setToolTip('\n'.join(f'{r.emisor.rfc} {r.emisor.name} {r.total:,.2f} ({r.uuid})'
+                                       for r in self.unpaid))
 
     def fill_table(self):
         self._loading = True
@@ -149,12 +176,15 @@ class QDiot(TabWidget):
             self.update_status(item.row())
 
     def update_status(self, row):
-        errors = diot.validate(self.providers[row], self.period.year)
+        provider = self.providers[row]
+        errors = diot.validate(provider, self.period.year)
+        warnings = provider.warnings
         was_loading, self._loading = self._loading, True
-        item = QTableWidgetItem('Revisar' if errors else 'OK')
+        item = QTableWidgetItem('Revisar' if errors else ('Aviso' if warnings else 'OK'))
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        item.setToolTip('\n'.join(errors) if errors else 'Sin errores')
-        item.setForeground(Qt.GlobalColor.red if errors else Qt.GlobalColor.darkGreen)
+        item.setToolTip('\n'.join(errors + warnings) if errors or warnings else 'Sin errores')
+        item.setForeground(Qt.GlobalColor.red if errors else
+                           (Qt.GlobalColor.darkYellow if warnings else Qt.GlobalColor.darkGreen))
         self.table.setItem(row, COL['Estado'], item)
         self._loading = was_loading
 

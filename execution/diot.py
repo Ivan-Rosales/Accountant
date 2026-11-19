@@ -153,6 +153,8 @@ def aggregate(records, settings: dict[str, DiotSettings] | None = None) -> list[
         }
         base = {k: Decimal(v or 0) for k, v in base.items()}
         p.documentos += 1
+        if aviso := getattr(r, 'aviso', None):
+            p.warnings.append(aviso)
 
         if r.tipo == 'E':
             p.dev16 += base['tasa16']

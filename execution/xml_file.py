@@ -22,6 +22,8 @@ TFD_NS = 'http://www.sat.gob.mx/TimbreFiscalDigital'
 IMPLOCAL_NS = 'http://www.sat.gob.mx/implocal'
 NOMINA12_NS = 'http://www.sat.gob.mx/nomina12'
 NOMINA11_NS = 'http://www.sat.gob.mx/nomina'
+PAGOS20_NS = 'http://www.sat.gob.mx/Pagos20'
+PAGOS10_NS = 'http://www.sat.gob.mx/Pagos'
 
 IVA, IEPS, ISR = '002', '003', '001'
 IMPUESTO_32 = {'IVA': IVA, 'IEPS': IEPS, 'ISR': ISR}
@@ -204,6 +206,70 @@ class XmlFile:
         node = self.root.find('cfdi:Complemento/implocal:ImpuestosLocales', self.ns)
         if node is None: return ZERO
         return self.mxn(to_decimal(node.attrib.get('TotaldeRetenciones')))
+
+    @cached_property
+    def metodo_pago(self) -> str | None:
+        """PUE (una exhibición) o PPD (parcialidades o diferido). CFDI 3.2 no usa estas claves."""
+        value = self.attr('MetodoPago')
+        return value.upper() if value else None
+
+    # ---- complemento de pagos (REP) -------------------------------------------
+    @cached_property
+    def pagos(self) -> list[dict]:
+        """Pagos aplicados a cada documento relacionado (Pagos 2.0 y 1.0), con importes en pesos.
+
+        Cada elemento: documento_uuid, fecha_pago, imp_pagado y, si el complemento trae ImpuestosDR
+        (Pagos 2.0), el desglose base_tasa16/8/0, base_exento, base_no_objeto, iva, ret_iva, ret_isr.
+        """
+        result = []
+        for prefix, uri in (('p20', PAGOS20_NS), ('p10', PAGOS10_NS)):
+            ns = self.ns | {prefix: uri}
+            for pago in self.root.findall(f'cfdi:Complemento/{prefix}:Pagos/{prefix}:Pago', ns):
+                fecha = datetime.fromisoformat(pago.attrib['FechaPago'][:19])
+                moneda_p = (pago.attrib.get('MonedaP') or 'MXN').upper()
+                tc_p = Decimal(1) if moneda_p == 'MXN' else to_decimal(pago.attrib.get('TipoCambioP'), Decimal(1))
+
+                for dr in pago.findall(f'{prefix}:DoctoRelacionado', ns):
+                    moneda_dr = (dr.attrib.get('MonedaDR') or moneda_p).upper()
+                    equivalencia = to_decimal(dr.attrib.get('EquivalenciaDR') or dr.attrib.get('TipoCambioDR'),
+                                              Decimal(1))
+                    # importe en moneda del documento -> moneda del pago -> pesos
+                    factor = Decimal(1) if moneda_dr == 'MXN' else tc_p / (equivalencia or Decimal(1))
+
+                    def mxn(value):
+                        return normalize_number(to_decimal(value) * factor)
+
+                    row = {
+                        'documento_uuid': (dr.attrib.get('IdDocumento') or '').upper(),
+                        'fecha_pago': fecha,
+                        'imp_pagado': mxn(dr.attrib.get('ImpPagado')),
+                        'con_impuestos': False,
+                        'base_tasa16': ZERO, 'base_tasa8': ZERO, 'base_tasa0': ZERO, 'base_exento': ZERO,
+                        'base_no_objeto': ZERO, 'iva': ZERO, 'ret_iva': ZERO, 'ret_isr': ZERO,
+                    }
+
+                    impuestos = dr.find(f'{prefix}:ImpuestosDR', ns)
+                    if impuestos is not None:
+                        row['con_impuestos'] = True
+                        for t in impuestos.findall(f'{prefix}:TrasladosDR/{prefix}:TrasladoDR', ns):
+                            if t.attrib.get('ImpuestoDR') != IVA: continue
+                            base = mxn(t.attrib.get('BaseDR'))
+                            if t.attrib.get('TipoFactorDR') == 'Exento':
+                                row['base_exento'] += base
+                                continue
+                            key = {'tasa16': 'base_tasa16', 'tasa8': 'base_tasa8', 'tasa0': 'base_tasa0'}.get(
+                                self._rate_key(to_decimal(t.attrib.get('TasaOCuotaDR'))), 'base_tasa16')
+                            row[key] += base
+                            row['iva'] += mxn(t.attrib.get('ImporteDR'))
+                        for r in impuestos.findall(f'{prefix}:RetencionesDR/{prefix}:RetencionDR', ns):
+                            key = {IVA: 'ret_iva', ISR: 'ret_isr'}.get(r.attrib.get('ImpuestoDR'))
+                            if key: row[key] += mxn(r.attrib.get('ImporteDR'))
+                    elif dr.attrib.get('ObjetoImpDR') == '01':
+                        row['con_impuestos'] = True
+                        row['base_no_objeto'] = row['imp_pagado']
+
+                    result.append(row)
+        return result
 
     # ---- nómina ------------------------------------------------------------
     @cached_property
