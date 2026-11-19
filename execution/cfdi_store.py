@@ -1,7 +1,7 @@
 """Persistencia de CFDI por cliente: guardar lo leído de los ZIP y consultar por periodo."""
 from typing import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from execution.xml_file import XmlFile
@@ -37,6 +37,7 @@ def _values(client: Cliente, xml: XmlFile, origen: str | None) -> dict:
         base_tasa0=bases['tasa0'],
         base_exento=bases['exento'],
         base_no_objeto=bases['no_objeto'],
+        percepciones=xml.percepciones if xml.tipo == 'N' else None,
         origen=origen,
     )
 
@@ -68,11 +69,16 @@ def save_xml_files(session: Session, client: Cliente, xml_files: Iterable[XmlFil
 
 def month_records(session: Session, client: Cliente, year: int, month: int, ingreso: bool,
                   include_cancelled=False) -> list[Comprobante]:
+    if ingreso:
+        kind = and_(Comprobante.ingreso.is_(True), Comprobante.tipo != 'N')
+    else:
+        # Las nóminas que emite el cliente (como patrón) son egresos
+        kind = or_(Comprobante.ingreso.is_(False), and_(Comprobante.ingreso.is_(True), Comprobante.tipo == 'N'))
     query = select(Comprobante).where(
         Comprobante.cliente_id == client.id,
         Comprobante.year == year,
         Comprobante.month == month,
-        Comprobante.ingreso == ingreso,
+        kind,
     ).order_by(Comprobante.fecha, Comprobante.uuid)
     if not include_cancelled:
         query = query.where(Comprobante.cancelado.is_(False))

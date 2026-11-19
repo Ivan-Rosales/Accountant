@@ -1,5 +1,5 @@
 from exceptions import ValidationException
-from PySide6.QtWidgets import QVBoxLayout, QCheckBox
+from PySide6.QtWidgets import QVBoxLayout, QCheckBox, QComboBox, QHBoxLayout, QLabel
 
 from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
@@ -8,6 +8,7 @@ from app.widgets.confirm_box import QConfirmMessageBox
 from app.widgets.file_selector import QFilesSelector
 from app.widgets.metrics import QMetrics
 from app.workers.month_summary import MonthSummaryWorker
+from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from base.tab import TabWidget
 from logger import logger
 
@@ -22,6 +23,14 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
         self.selector = QFilesSelector(self, filter="*.zip")
         self.prov_check = QCheckBox('Proveedores', self)
 
+        # Importe con el que las nóminas que paga el cliente entran a sus egresos
+        self.nomina_label = QLabel('Nóminas en egresos', self)
+        self.nomina_combo = QComboBox(self)
+        for key, label in NOMINA_IMPORTES.items():
+            self.nomina_combo.addItem(label, key)
+        self.nomina_combo.setToolTip('Neto pagado: total del recibo (como el programa anterior).\n'
+                                     'Percepciones: sueldo bruto antes de ISR retenido, IMSS y otras deducciones.')
+
         self.metrics = QMetrics(self)
         self.execute_btn = QProgressButton('ejecutar', self, fn=self.start_worker)
         self.execute_btn.setProperty('class', 'primary')
@@ -33,10 +42,22 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
             'false',
         )
 
+        settings.register_setting(
+            'nomina-importe',
+            lambda: self.nomina_combo.currentData(),
+            lambda x: self.nomina_combo.setCurrentIndex(max(0, self.nomina_combo.findData(x))),
+            NOMINA_NETO,
+        )
+
     def load_ui(self, layout):
         layout.addItem(spacer)
         layout.addWidget(self.selector)
         layout.addWidget(self.prov_check)
+
+        nomina_layout = QHBoxLayout()
+        nomina_layout.addWidget(self.nomina_label)
+        nomina_layout.addWidget(self.nomina_combo, 1)
+        layout.addLayout(nomina_layout)
         layout.addItem(spacer)
 
         layout.addWidget(self.metrics)
@@ -52,6 +73,7 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
 
         params = {
             'create_providers': self.prov_check.isChecked(),
+            'nomina_importe': self.nomina_combo.currentData(),
         }
 
         return paths, client, params

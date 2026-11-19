@@ -91,8 +91,24 @@ class DatabaseWorker(QObject):
             self._engine_path = database_dir
             logger.info(f'Database {database_dir}')
             self.base.metadata.create_all(self._engine)
+            self.add_missing_columns(self._engine)
 
         return self._engine
+
+    def add_missing_columns(self, engine):
+        """Migración mínima: agrega columnas nuevas (nullables) a tablas que ya existían."""
+        inspector = inspect(engine)
+        with engine.begin() as connection:
+            for table in self.base.metadata.sorted_tables:
+                existing = {c['name'] for c in inspector.get_columns(table.name)}
+                for column in table.columns:
+                    if column.name in existing: continue
+                    if not column.nullable:
+                        logger.error(f'No se puede agregar la columna obligatoria {table.name}.{column.name}')
+                        continue
+                    column_type = column.type.compile(dialect=engine.dialect)
+                    connection.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}')
+                    logger.info(f'Columna agregada {table.name}.{column.name}')
 
     @property
     def session(self):

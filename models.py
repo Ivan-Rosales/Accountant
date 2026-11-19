@@ -103,6 +103,7 @@ class Comprobante(DatabaseWorker.base):
     base_tasa0 = Column(Money)
     base_exento = Column(Money)
     base_no_objeto = Column(Money)
+    percepciones = Column(Money, comment='nómina: percepciones brutas')
 
     cancelado = Column(Boolean, nullable=False, default=False)
     origen = Column(String(300), comment='archivo ZIP del que se importó')

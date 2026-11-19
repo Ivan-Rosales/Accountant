@@ -88,3 +88,73 @@ def test_carpeta_sin_xml(cliente_db, tmp_path):
     (tmp_path / 'vacio').mkdir()
     with pytest.raises(ValidationException):
         process_folder(cliente_db, tmp_path / 'vacio')
+
+
+EMPLEADO_RFC = 'PEPJ800101AB1'
+
+
+def nomina(percepciones=10000, deducciones=1500):
+    return Cfdi(emisor_rfc=CLIENTE_RFC, receptor_rfc=EMPLEADO_RFC, receptor_nombre='Juan Perez', tipo='N',
+                fecha=ENERO, descuento=D(deducciones), conceptos=[Concepto(percepciones, traslados=[])])
+
+
+def egresos_rows(cliente):
+    from execution.month_summary import MonthSummary
+    summary = MonthSummary(cliente, year=2025, month=1, rev=False)
+    sheet = load_workbook(summary.filename)[month_name[1].capitalize()]
+    return sorted((sheet.cell(r, 2).value, sheet.cell(r, 4).value, sheet.cell(r, 5).value)
+                  for r in range(6, sheet.max_row + 1) if isinstance(sheet.cell(r, 1).value, datetime))
+
+
+def test_percepciones_desde_xml(xml_dir):
+    from execution.xml_file import XmlFile
+    xml = XmlFile(nomina().write(xml_dir))
+    assert (xml.tipo, xml.total, xml.percepciones) == ('N', D('8500.00'), D('10000.00'))
+
+
+@pytest.mark.parametrize('modo, importe', [(None, 8500), ('neto', 8500), ('percepciones', 10000)])
+def test_zip_solo_nominas_va_a_egresos(cliente_db, tmp_path, modo, importe):
+    result = process_folder(cliente_db, zip_folder(tmp_path, 'n', [nomina()]), nomina_importe=modo)
+    assert result.summary.rev is False
+    assert result.summary.filename.name.endswith('EGRESOS.xlsx')
+    assert egresos_rows(cliente_db) == [('JUAN PEREZ', importe, 0)]  # nombre del trabajador, IVA 0
+
+
+def test_nomina_en_zip_de_ingresos_se_pasa_a_egresos(cliente_db, tmp_path):
+    result = process_folder(cliente_db, zip_folder(tmp_path, 'i', [venta(100), nomina()]))
+    assert result.summary.rev is True
+    assert sheet_totals(result) == [100]                       # no aparece en ingresos
+    assert egresos_rows(cliente_db) == [('JUAN PEREZ', 8500, 0)]  # sí en egresos
+
+
+def test_nominas_y_compras_del_mes_se_juntan(cliente_db, tmp_path):
+    compra = Cfdi(emisor_rfc=PROVEEDOR_RFC, receptor_rfc=CLIENTE_RFC, emisor_nombre='Proveedor', fecha=ENERO,
+                  conceptos=[Concepto(300)])
+    process_folder(cliente_db, zip_folder(tmp_path, 'e', [compra]))
+    process_folder(cliente_db, zip_folder(tmp_path, 'n', [nomina()]))
+    assert egresos_rows(cliente_db) == [('JUAN PEREZ', 8500, 0), ('PROVEEDOR', 300, 48)]
+
+
+def test_nominas_no_van_al_txt_de_proveedores(cliente_db, tmp_path):
+    compra = Cfdi(emisor_rfc=PROVEEDOR_RFC, receptor_rfc=CLIENTE_RFC, fecha=ENERO, conceptos=[Concepto(300)])
+    process_folder(cliente_db, zip_folder(tmp_path, 'n', [nomina()]))
+    result = process_folder(cliente_db, zip_folder(tmp_path, 'e', [compra]), create_providers=True)
+    txt = next((result.providers.filename.parent / 'proveedores').glob('*.txt'))
+    assert EMPLEADO_RFC not in txt.read_text()
+
+
+def test_migracion_agrega_columna_percepciones(tmp_path, monkeypatch):
+    import sqlite3
+    from app.core.settings import settings
+    db = tmp_path / 'vieja.sqlite3'
+    con = sqlite3.connect(db)
+    con.execute('CREATE TABLE cfdi (id INTEGER PRIMARY KEY, cliente_id INTEGER NOT NULL, uuid VARCHAR(36) NOT NULL)')
+    con.commit(); con.close()
+
+    original = settings.value
+    monkeypatch.setattr(settings, 'value', lambda k, d=None: str(db) if k == 'dbdir' else original(k, d))
+    monkeypatch.setattr(database_worker, '_engine', None)
+    database_worker.engine  # crea/migra
+    columns = {r[1] for r in sqlite3.connect(db).execute('PRAGMA table_info(cfdi)')}
+    assert 'percepciones' in columns
+    database_worker._engine.dispose()

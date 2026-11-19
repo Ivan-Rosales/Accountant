@@ -72,6 +72,7 @@ class MonthSummaryProviders(MonthSummary):
     def generate_providers(self):
         providers = defaultdict(list)
         for xml_file in self.xml_files.values():
+            if xml_file.tipo == 'N': continue  # los trabajadores no son proveedores (DIOT)
             person: XmlNode = xml_file.receptor if self.rev else xml_file.emisor
             providers[person].append(xml_file)
 

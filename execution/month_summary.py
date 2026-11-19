@@ -12,6 +12,9 @@ from exceptions import ValidationException
 from execution.xml_file import XmlFile
 
 GENERIC_RFCS = {'XAXX010101000', 'XEXX010101000'}
+NOMINA_NETO = 'neto'
+NOMINA_PERCEPCIONES = 'percepciones'
+NOMINA_IMPORTES = {NOMINA_NETO: 'Neto pagado', NOMINA_PERCEPCIONES: 'Percepciones'}
 PUBLICO_EN_GENERAL = 'PUBLICO EN GENERAL'
 from functions import normalize_number, decimal_property
 from logger import logger
@@ -36,6 +39,9 @@ class MonthSummary(WorkbookExecution):
         self.columns_set = False
         self.footer_set = False
         self.rev = kwargs.get('rev', False)
+        self.nomina_importe = kwargs.get('nomina_importe') or NOMINA_NETO
+        if self.nomina_importe not in NOMINA_IMPORTES:
+            raise ValidationException(f'Importe de nómina inválido: {self.nomina_importe}')
 
         self.year = kwargs.get('year')
         self.month = kwargs.get('month')
@@ -137,10 +143,18 @@ class MonthSummary(WorkbookExecution):
             self.validate_file(xml_file)
             self.add_file(xml_file)
 
+    def is_nomina_emitida(self, xml) -> bool:
+        """Nómina que el cliente paga como patrón: es un gasto (egreso), aunque él sea el emisor."""
+        return xml.tipo == 'N' and xml.emisor.rfc == self.client.rfc
+
+    def detect_rev(self, records) -> bool:
+        """Ingresos si el cliente emite los comprobantes (sin contar nóminas); solo nóminas => egresos."""
+        return any(i.tipo != 'N' and i.emisor.rfc == self.client.rfc for i in records)
+
     def set_header(self, xml: XmlFile):
         self.year = xml.date.year
         self.month = xml.date.month
-        self.rev = self.client.rfc == xml.emisor.rfc
+        self.rev = self.detect_rev(list(self.xml_files.values()) or [xml])
 
         self.sheet.cell(row=1, column=1).value = str(self.client.fullname()).upper()
         self.sheet.cell(row=2, column=1).value = f'concentrado de {'ingresos' if self.rev else 'egresos'}'.upper()
@@ -173,6 +187,13 @@ class MonthSummary(WorkbookExecution):
         - GRAVADO es el valor de actos a tasa de IVA > 0, leído de los conceptos (no IVA x 6.25).
         """
         zero = Decimal(0)
+        if xml.tipo == 'N':
+            importe = xml.total
+            if self.nomina_importe == NOMINA_PERCEPCIONES and getattr(xml, 'percepciones', None) is not None:
+                importe = xml.percepciones
+            return {'subtotal': importe, 'no gravado': importe, 'gravado': zero, 'ieps': zero, 'iva': zero,
+                    'total': importe, 'ret iva': zero, 'ret isr': zero, 'neto': importe}
+
         if xml.tipo == 'P':
             return {k: zero for k in ('subtotal', 'no gravado', 'gravado', 'ieps', 'iva', 'total',
                                       'ret iva', 'ret isr', 'neto')}
@@ -216,12 +237,13 @@ class MonthSummary(WorkbookExecution):
         if xml.uuid not in self.xml_files:
             self.xml_files[xml.uuid] = xml
 
-        if xml.tipo == 'N': return
+        if xml.tipo == 'N' and (self.rev or not self.is_nomina_emitida(xml)):
+            return  # nóminas: solo las que paga el cliente, y solo en egresos
 
         row = row or max([6, self.sheet.max_row + 1])
         values = self.row_values(xml)
 
-        counterpart = xml.receptor if self.rev else xml.emisor
+        counterpart = xml.receptor if (self.rev or xml.tipo == 'N') else xml.emisor
         name = PUBLICO_EN_GENERAL if counterpart.rfc in GENERIC_RFCS else (counterpart.name or counterpart.rfc)
 
         self.sheet.cell(row=row, column=1).value = xml.date

@@ -18,6 +18,7 @@ class MonthSummaryWorker(QObject):
 
     default_params = {
         'create_providers': False,
+        'nomina_importe': None,
     }
 
     @staticmethod
@@ -45,7 +46,8 @@ class MonthSummaryWorker(QObject):
                 zipfile = ZipFile(path)
                 with zipfile as data_path:
                     result = process_folder(client, data_path, origen=Path(path).name,
-                                            create_providers=create_providers)
+                                            create_providers=create_providers,
+                                            nomina_importe=params['nomina_importe'])
                     summary = result.summary
                     self.progress.emit(c * (2 if create_providers else 1) / n_files)
 

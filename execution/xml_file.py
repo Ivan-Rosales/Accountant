@@ -20,6 +20,8 @@ CFDI_NAMESPACES = {
 }
 TFD_NS = 'http://www.sat.gob.mx/TimbreFiscalDigital'
 IMPLOCAL_NS = 'http://www.sat.gob.mx/implocal'
+NOMINA12_NS = 'http://www.sat.gob.mx/nomina12'
+NOMINA11_NS = 'http://www.sat.gob.mx/nomina'
 
 IVA, IEPS, ISR = '002', '003', '001'
 IMPUESTO_32 = {'IVA': IVA, 'IEPS': IEPS, 'ISR': ISR}
@@ -202,6 +204,24 @@ class XmlFile:
         node = self.root.find('cfdi:Complemento/implocal:ImpuestosLocales', self.ns)
         if node is None: return ZERO
         return self.mxn(to_decimal(node.attrib.get('TotaldeRetenciones')))
+
+    # ---- nómina ------------------------------------------------------------
+    @cached_property
+    def percepciones(self):
+        """Percepciones brutas de un CFDI de nómina (antes de ISR retenido, IMSS y demás deducciones).
+
+        Nómina 1.2: atributo TotalPercepciones. Nómina 1.1 o sin el atributo: TotalGravado + TotalExento
+        de cfdi:Percepciones. Si no hay complemento se usa SubTotal.
+        """
+        for prefix, uri in (('n12', NOMINA12_NS), ('n11', NOMINA11_NS)):
+            nomina = self.root.find(f'cfdi:Complemento/{prefix}:Nomina', self.ns | {prefix: uri})
+            if nomina is None: continue
+            if nomina.attrib.get('TotalPercepciones') is not None:
+                return self.mxn(to_decimal(nomina.attrib['TotalPercepciones']))
+            node = nomina.find(f'{prefix}:Percepciones', {prefix: uri})
+            if node is not None:
+                return self.mxn(to_decimal(node.attrib.get('TotalGravado')) + to_decimal(node.attrib.get('TotalExento')))
+        return self.subtotal
 
     # ---- desglose por tasa de IVA (valor de actos, sin impuestos) -----------
     @cached_property

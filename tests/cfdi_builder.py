@@ -196,9 +196,19 @@ class Cfdi:
             f'<cfdi:Receptor {self._attrs(Rfc=self.receptor_rfc, Nombre=self.receptor_nombre, **receptor_extra)}/>'
             f'<cfdi:Conceptos>{conceptos}</cfdi:Conceptos>'
             f'{impuestos}'
-            f'<cfdi:Complemento><tfd:TimbreFiscalDigital Version="1.1" UUID="{self.uuid}" '
+            f'<cfdi:Complemento>{self._nomina()}<tfd:TimbreFiscalDigital Version="1.1" UUID="{self.uuid}" '
             f'FechaTimbrado="{self.fecha.strftime("%Y-%m-%dT%H:%M:%S")}"/></cfdi:Complemento>'
             '</cfdi:Comprobante>'
+        )
+
+    def _nomina(self):
+        """Complemento de nómina 1.2: percepciones = importe del concepto, deducciones = descuento."""
+        if self.tipo != 'N': return ''
+        return (
+            '<nomina12:Nomina xmlns:nomina12="http://www.sat.gob.mx/nomina12" Version="1.2" TipoNomina="O" '
+            f'TotalPercepciones="{money(self.subtotal)}" TotalDeducciones="{money(self.descuento)}">'
+            f'<nomina12:Percepciones TotalSueldos="{money(self.subtotal)}" TotalGravado="{money(self.subtotal)}" TotalExento="0.00"/>'
+            '</nomina12:Nomina>'
         )
 
     def _to_xml_32(self):
