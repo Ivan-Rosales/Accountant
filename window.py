@@ -1,14 +1,22 @@
 import os
 
-from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
+from PySide6.QtCore import QSize, QTimer
+from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget, QLabel, QApplication
 
 from app import settings as app_settings
 from app.core.settings import settings
 from app.views.client_admin import QClientAdmin
+from app.views.cfdi_admin import QCfdiAdmin
 from app.views.configuration import QConfiguration
+from app.views.contacts import QContacts
+from app.views.diot import QDiot
+from app.views.mail import QMail
 from app.views.month_summary import QMonthSummary
 from app.views.year_summary import QYearSummary
+from app.widgets.animations import fade_in, FAST
 from app.widgets.common import spacer, QButton
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.debug_tools import QDebugTools
 from app.widgets.selector_model import QSelectorModel
 from app.workers.database import database_worker
@@ -19,15 +27,29 @@ from models import Cliente
 
 class MainWindow(BaseWindow):
     layout_class = QGridLayout
-    windows_size = (801, 451)
+    windows_size = (1040, 640)
     margin = (0, 32, 0, 0)
     spacing = 0
 
     tabs = {
         'text-file': QMonthSummary,
         'bar-char': QYearSummary,
+        'report': QCfdiAdmin,
+        'report-3': QDiot,
         'user': QClientAdmin,
+        'contacts': QContacts,
+        'mail': QMail,
         'gear': QConfiguration,
+    }
+    tab_labels = {
+        'text-file': 'Mensual',
+        'bar-char': 'Anual',
+        'report': 'Comprobantes',
+        'report-3': 'DIOT',
+        'user': 'Clientes',
+        'contacts': 'Contactos',
+        'mail': 'Correos',
+        'gear': 'Configuración',
     }
 
     _load_qs = False
@@ -37,7 +59,10 @@ class MainWindow(BaseWindow):
         self.active_tab = None
         super().__init__(*args, **kwargs)
 
-        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'gear')
+        fullscreen = QShortcut(QKeySequence('F11'), self)
+        fullscreen.activated.connect(lambda: self.showMaximized() if self.isFullScreen() else self.showFullScreen())
+
+        settings.register_setting('main-tab', lambda: self.active_tab, self.change_current_tab, 'text-file')
 
     def create_ui(self):
         self.client_selector = QSelectorModel(self, context={'model': Cliente})
@@ -62,21 +87,36 @@ class MainWindow(BaseWindow):
         self.header.setLayout(self.header_layout)
 
         self.buttons_layout = QVBoxLayout()
-        self.buttons_layout.setContentsMargins(0, 5, 5, 5)
-        self.buttons_layout.setSpacing(5)
+        self.buttons_layout.setContentsMargins(10, 12, 10, 12)
+        self.buttons_layout.setSpacing(4)
         self.buttons = QWidget()
         self.buttons.setObjectName("MainButtons")
+        self.buttons.setFixedWidth(176)
         self.buttons.setLayout(self.buttons_layout)
+
+        self.page_header = QWidget()
+        self.page_header.setObjectName('PageHeader')
+        page_layout = QVBoxLayout(self.page_header)
+        page_layout.setContentsMargins(20, 16, 20, 4)
+        page_layout.setSpacing(2)
+        self.page_title = QLabel(self.page_header)
+        self.page_title.setProperty('class', 'page-title')
+        self.page_subtitle = QLabel(self.page_header)
+        self.page_subtitle.setProperty('class', 'secondary')
+        page_layout.addWidget(self.page_title)
+        page_layout.addWidget(self.page_subtitle)
 
     def load_ui(self, layout: QGridLayout):
         layout.setColumnStretch(0, 0)
         layout.setColumnStretch(1, 1)
         layout.setRowStretch(0, 0)
-        layout.setRowStretch(1, 1)
+        layout.setRowStretch(1, 0)
+        layout.setRowStretch(2, 1)
 
         layout.addWidget(self.header, 0, 0, 1, 2)
 
-        layout.addWidget(self.buttons, 1, 0)
+        layout.addWidget(self.buttons, 1, 0, 2, 1)
+        layout.addWidget(self.page_header, 1, 1)
 
         for name, widget in self.tabs.items():
             if name == 'gear':
@@ -86,9 +126,29 @@ class MainWindow(BaseWindow):
 
         conf = self.get_widget_tab('gear')
         conf.register_change('dbdir', database_worker.reset)
-        conf.register_change('theme', self.load_qss)
+        conf.register_change('theme', self.apply_theme)
+        conf.register_change('workdir', self.get_widget_tab('bar-char').set_workdir)
+        for key in ('mail-watch', 'mail-watchdir'):
+            conf.register_change(key, self.get_widget_tab('mail').apply_watch_settings)
+        conf.register_change('diot-base', self.get_widget_tab('report-3').request_load)
         self.load_qss(conf.get_conf_value('theme'))
         self.header.setFocus()
+
+    def apply_theme(self, theme=None):
+        """Cambia el tema mostrando un indicador: recalcular el estilo de toda la ventana tarda un momento."""
+        overlay = getattr(self, 'theme_loader', None)
+        if overlay is None:
+            overlay = self.theme_loader = QLoadingOverlay(self)
+        overlay.start('Aplicando tema...', immediate=True)
+        QApplication.processEvents()  # pintar el indicador antes de bloquear con setStyleSheet
+
+        def apply():
+            try:
+                self.load_qss(theme)
+            finally:
+                overlay.stop()
+
+        QTimer.singleShot(30, apply)
 
     def get_widget_tab(self, name):
         _, widget = self._tabs[name]
@@ -97,6 +157,9 @@ class MainWindow(BaseWindow):
     def add_tab(self, name, widget):
         icon = get_icon(name)
         btn = QButton(icon, self, fn=lambda _, key=name: self.change_current_tab(key))
+        btn.setText(f'  {self.tab_labels.get(name, name)}')
+        btn.setIconSize(QSize(18, 18))
+        btn.setMinimumHeight(38)
 
         if tooltip_label := getattr(widget, 'tooltip_label', None):
             btn.setToolTip(tooltip_label.capitalize())
@@ -104,7 +167,7 @@ class MainWindow(BaseWindow):
         self.buttons_layout.addWidget(btn)
         self._tabs[name] = (btn, widget)
 
-        self._layout.addWidget(widget, 1, 1)
+        self._layout.addWidget(widget, 2, 1)
         widget.hide()
 
     def change_current_tab(self, active):
@@ -122,7 +185,13 @@ class MainWindow(BaseWindow):
 
         if to_active_btn and to_show_widget:
             self.setPropertyUpddate(to_active_btn, 'state', 'active')
+            self.page_title.setText(getattr(to_show_widget, 'page_title', ''))
+            self.page_subtitle.setText(getattr(to_show_widget, 'page_subtitle', ''))
+            was_visible = to_show_widget.isVisible()
             to_show_widget.show()
+            if not was_visible and self.isVisible():
+                fade_in(to_show_widget, slide=8)
+                fade_in(self.page_header, duration=FAST)
 
     def open_path(self):
         client = self.client_selector.get_current()

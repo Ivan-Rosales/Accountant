@@ -36,6 +36,7 @@ class XmlFileFake:
     total: Decimal
     ieps: Decimal
     iva: Decimal
+    gravado: Decimal | None = None
 
 
 class ImportFilesWorker(QObject):
@@ -108,7 +109,9 @@ class ImportFilesWorker(QObject):
         return (
             normalize_number(ingresos + prev_ingresos),
             normalize_number(egresos + prev_egresos),
-            (abs(abs(iva_causado - iva_acreditado) + prev_iva)),
+            # El programa anterior guarda el saldo a favor arrastrado en positivo (B25).
+            # Aquí se usa la convención con signo: positivo = a cargo, negativo = a favor.
+            normalize_number(iva_causado - iva_acreditado - abs(prev_iva)),
         )
 
     def get_month_file(self, month, kind=''):
@@ -141,7 +144,8 @@ class ImportFilesWorker(QObject):
 
     def get_columns(self, sheet, row, fields, columns_row=4):
         title_row = sheet[columns_row]
-        columns = [i.column for i in title_row if isinstance(i.value, str) and i.value.lower() in fields]
+        # El programa anterior escribe "RET  IVA" con dos espacios: se normalizan los encabezados
+        columns = [i.column for i in title_row if isinstance(i.value, str) and ' '.join(i.value.lower().split()) in fields]
         values = [sheet.cell(row=row, column=column).value for column in columns]
         return normalize_number(Decimal(sum([normalize_number(Decimal(value)) for value in values])))
 
@@ -168,6 +172,14 @@ class ImportFilesWorker(QObject):
             total = self.get_columns(sheet, date_cell.row, ['total'])
             ret_iva = self.get_columns(sheet, date_cell.row, ['ret iva'])
             ret_isr = self.get_columns(sheet, date_cell.row, ['ret isr'])
+            has_gravado = any(isinstance(c.value, str) and c.value.strip().lower() == 'gravado' for c in sheet[4])
+            gravado = abs(self.get_columns(sheet, date_cell.row, ['gravado'])) if has_gravado else None
+            neto = self.get_columns(sheet, date_cell.row, ['neto'])
+            if ret_iva or ret_isr:
+                total = neto  # en el programa anterior "TOTAL" es antes de retenciones y "NETO" lo cobrado
+            is_negative = total < 0
+            if is_negative:
+                total, iva, ieps, ret_iva, ret_isr = (abs(v) for v in (total, iva, ieps, ret_iva, ret_isr))
 
             if kind:
                 receptor = PersonFake(rfc='', name=name_cell.value)
@@ -177,8 +189,8 @@ class ImportFilesWorker(QObject):
                 receptor = PersonFake(rfc=self.client.rfc, name=self.client.fullname())
 
             xml = XmlFileFake(date=date_cell.value, emisor=emisor, total=total, ieps=ieps, iva=iva, ret_isr=ret_isr,
-                              uuid=f'{datetime.now().timestamp()}-{uuid_cell.value[2:]}', tipo='', receptor=receptor,
-                              ret_iva=ret_iva)
+                              uuid=f'{datetime.now().timestamp()}-{uuid_cell.value[2:]}', tipo='E' if is_negative else 'I',
+                              receptor=receptor, ret_iva=ret_iva, gravado=gravado)
 
             summary.xml_files[xml.uuid] = xml
 
@@ -187,6 +199,7 @@ class ImportFilesWorker(QObject):
 
     def on_start(self, path, clients):
         try:
+            self.files = []  # por instancia y por corrida: antes era una lista de clase que se acumulaba
             self.clients = clients
             self.search_files(path)
             summary = self.generate_new_files()

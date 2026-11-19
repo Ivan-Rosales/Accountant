@@ -1,11 +1,19 @@
 QLineEdit {
-    background-color: transparent;
-    border: 1px solid #6c757d;
-    border-radius: 6px;
-    padding: 6px 8px;
+    background-color: #1e2227;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 7px 10px;
     outline: none;
 }
 
+QLineEdit:hover {
+    border-color: #3d444d;
+}
+
+QLineEdit:focus {
+    border-color: {{color}};
+}
+
 QLineEdit:placeholder {
-    color: #666666;
+    color: #6e7681;
 }

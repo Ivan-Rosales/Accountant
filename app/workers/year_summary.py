@@ -24,6 +24,6 @@ class YearSummaryWorker(QObject):
             self.progress.emit(1)
             self.success.emit(year_summary)
         except Exception as error:
-            log = Log('year_summary', {'client': client.to_dict(), 'year': year, 'month': month})
+            log = Log('year_summary', {'client': client.to_dict() if isinstance(client, Cliente) else None, 'year': year, 'month': month})
             setattr(error, 'log', log)
             self.error.emit(error)

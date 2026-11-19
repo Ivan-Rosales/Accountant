@@ -32,5 +32,4 @@ class QMetrics(BaseWidget):
         self.counter.setText(f'{self.today_metrics.registers} registros')
 
     def add_registers_today(self, count):
-        self.today_metrics.registers += count
-        self.today_metrics.save()
+        Metrica.increment('registers', count, fecha=datetime.now().date())

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from PySide6.QtCore import Qt
 from qframelesswindow import FramelessDialog
 
 from app.mixin.loadui import LoadUiMixin
@@ -9,7 +10,8 @@ open_dialogs = {}
 
 
 class BaseDialog(TitleBarMixin, LoadUiMixin, FramelessDialog):
-    margin = (10, 42, 10, 10)
+    margin = (24, 48, 24, 20)
+    windows_size = (440, 200)
 
     def __init__(self, *args, **kwargs):
         self.uuid = kwargs.pop('uuid', str(datetime.now().timestamp()))
@@ -17,6 +19,13 @@ class BaseDialog(TitleBarMixin, LoadUiMixin, FramelessDialog):
         self.widget_class = kwargs.pop('widget', None)
         super().__init__(*args, **kwargs)
         self.setObjectName(self.__class__.__name__)
+        # Modal estándar: solo botón de cerrar y tamaño fijo
+        for name in ('minBtn', 'maxBtn'):
+            if button := getattr(self.titleBar, name, None):
+                button.hide()
+        if hasattr(self, 'setResizeEnabled'): self.setResizeEnabled(False)
+        self.titleBar.setDoubleClickEnabled(False) if hasattr(self.titleBar, 'setDoubleClickEnabled') else None
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
     def create_ui(self):
         self.widget = self.widget_class(self)
@@ -30,6 +39,11 @@ class BaseDialog(TitleBarMixin, LoadUiMixin, FramelessDialog):
 
         open_dialogs[self.uuid] = True
         super().show()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        from app.widgets.animations import window_fade_in
+        window_fade_in(self)
 
     def hide(self):
         super().hide()

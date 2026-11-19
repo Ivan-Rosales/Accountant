@@ -41,9 +41,12 @@ class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
             self.theme = DEFAULT_THEME
 
         color = self.themes[self.theme]
-        self.setStyleSheet('')
 
         primary = color[0]
+        from app.widgets.switch import QSwitch
+        QSwitch.accent = primary
+        for switch in self.findChildren(QSwitch):
+            switch.update()
         self.setWindowIcon(self.svg_to_icon(self.icon_path, color=primary))
 
         logger.info(f'Set application theme {self.theme}')
@@ -52,22 +55,21 @@ class BaseWindow(TitleBarMixin, PropertyMixin, LoadUiMixin, FramelessWindow):
             path = Path(self.style_sheets)
             self.style_sheets = list(path.parent.glob(path.name))
 
-        if isinstance(self.style_sheets, (list, tuple)):
-            for style_sheet_path in self.style_sheets:
-                file = Path(style_sheet_path)
-                self.add_style_sheet(file.read_text(), color)
-
+        # Un solo setStyleSheet: aplicar cada archivo por separado recalculaba el estilo de toda la ventana N veces
+        sheets = [Path(path).read_text(encoding='utf-8') for path in self.style_sheets]
         if app_settings.SHOW_BORDER:
-            self.add_style_sheet('* { border: 1px solid red; }', color)
+            sheets.append('* { border: 1px solid red; }')
+        self.setStyleSheet(self.render_style_sheet('\n'.join(sheets), color))
 
-    def add_style_sheet(self, style_sheet, color):
-        current_style_sheet = self.styleSheet()
+    @staticmethod
+    def render_style_sheet(style_sheet, color):
         labels = ('{{color}}', '{{hover}}', '{{border}}', '{{pressed}}', '{{text}}')
-
         for i, label in enumerate(labels):
             style_sheet = style_sheet.replace(label, color[i])
+        return style_sheet
 
-        self.setStyleSheet(f'{current_style_sheet}\n{style_sheet}')
+    def add_style_sheet(self, style_sheet, color):
+        self.setStyleSheet(f'{self.styleSheet()}\n{self.render_style_sheet(style_sheet, color)}')
 
     def closeEvent(self, event):
         self._settings.set_widget_values()

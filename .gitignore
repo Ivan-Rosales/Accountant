@@ -8,5 +8,5 @@ updater.spec
 
 db.sqlite3*
 
-app/test/core/xml_test.xml
+.pytest_cache/
 dist/

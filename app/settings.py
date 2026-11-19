@@ -23,6 +23,7 @@ APPDATA_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.Ap
 DOCUMENTS_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
 
 DEFAULT_WORK_DIR = f'{DOCUMENTS_DIR}/concentrados'
+DEFAULT_MAIL_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
 DEFAULT_DATABASE_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/db.sqlite3'
 LOGS_DIR = f'{APPDATA_DIR}/{ORGANIZATION_NAME}/{APPLICATION_NAME}/logs/'
 

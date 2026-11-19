@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
-from sqlalchemy import create_engine, select, inspect, update
+from sqlalchemy import create_engine, select, inspect, update, event
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -47,6 +47,11 @@ class ModelMixin:
     def save(self, *args, **kwargs):
         database_worker.execute.emit(lambda: database_worker.save(self, *args, **kwargs))
 
+    @classmethod
+    def increment(cls, field, amount, **filters):
+        """Suma `amount` a `field` en el hilo de la BD (sin mutar objetos ORM desde la UI)."""
+        database_worker.execute.emit(lambda: database_worker.increment(cls, field, amount, **filters))
+
 
 class DatabaseWorker(QObject):
     execute = Signal(object)
@@ -58,9 +63,13 @@ class DatabaseWorker(QObject):
         super().__init__(*args, **kwargs)
         self.execute.connect(self.on_execute)
         self._session = None
+        self._engine = None
+        self._engine_path = None
 
     def reset(self, *_, **__):
+        if self._session is not None: self._session.close()
         self._session = None
+        self._engine = None
 
         models = self.base.registry.mappers
         for mapper in models:
@@ -68,24 +77,80 @@ class DatabaseWorker(QObject):
             model.all()
 
     @property
-    def session(self):
-        if self._session is None:
-            database_dir = settings.value('dbdir')
-            if database_dir is None:
-                logger.error('Database path is not defined')
-                return None
+    def engine(self):
+        database_dir = settings.value('dbdir')
+        if database_dir is None:
+            logger.error('Database path is not defined')
+            return None
 
+        if self._engine is None or self._engine_path != database_dir:
             Path(database_dir).parent.mkdir(parents=True, exist_ok=True)
-            engine = create_engine(f"sqlite:///{database_dir}", echo=False)
-            logger.info(f'Database {database_dir}')
-            self.base.metadata.create_all(engine)
+            # check_same_thread=False: los workers usan sesiones propias sobre el mismo archivo
+            self._engine = create_engine(f"sqlite:///{database_dir}", echo=False,
+                                         connect_args={'check_same_thread': False, 'timeout': 30})
+            self._engine_path = database_dir
 
+            @event.listens_for(self._engine, 'connect')
+            def enable_foreign_keys(dbapi_connection, _):
+                # SQLite no aplica ON DELETE CASCADE si no se activa por conexión
+                dbapi_connection.execute('PRAGMA foreign_keys=ON')
+
+            logger.info(f'Database {database_dir}')
+            self.base.metadata.create_all(self._engine)
+            self.add_missing_columns(self._engine)
+
+        return self._engine
+
+    def add_missing_columns(self, engine):
+        """Migración mínima: agrega columnas nuevas (nullables) a tablas que ya existían."""
+        inspector = inspect(engine)
+        with engine.begin() as connection:
+            for table in self.base.metadata.sorted_tables:
+                existing = {c['name'] for c in inspector.get_columns(table.name)}
+                for column in table.columns:
+                    if column.name in existing: continue
+                    if not column.nullable:
+                        logger.error(f'No se puede agregar la columna obligatoria {table.name}.{column.name}')
+                        continue
+                    column_type = column.type.compile(dialect=engine.dialect)
+                    connection.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}')
+                    logger.info(f'Columna agregada {table.name}.{column.name}')
+
+    @property
+    def session(self):
+        """Sesión del hilo de la base de datos (la usan los modelos de la interfaz)."""
+        if self._session is None:
+            engine = self.engine
+            if engine is None: return None
             self._session = sessionmaker(bind=engine)()
 
         return self._session
 
+    def new_session(self):
+        """Sesión independiente para usar dentro de un worker (un hilo distinto al de la BD)."""
+        return sessionmaker(bind=self.engine, expire_on_commit=False)()
+
     def on_execute(self, func):
-        if callable(func): func()
+        if not callable(func): return
+        try:
+            func()
+        except Exception as error:
+            # Sin rollback la sesión queda inutilizable después de un commit fallido
+            logger.error(f'Database operation failed: {error}')
+            if self._session is not None:
+                self._session.rollback()
+
+    def increment(self, model, field, amount, **filters):
+        logger.debug(f'Incrementing {model.__name__}.{field} by {amount} {filters}')
+
+        instance = self.session.execute(select(model).filter_by(**filters)).scalar_one_or_none()
+        if instance is None:
+            instance = model(**filters)
+            setattr(instance, field, 0)
+            self.session.add(instance)
+        setattr(instance, field, (getattr(instance, field) or 0) + amount)
+        self.session.commit()
+        self.get_all(model)
 
     def get_all(self, model):
         logger.debug(f'Getting {model.__name__}')

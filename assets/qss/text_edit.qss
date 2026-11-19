@@ -1,10 +1,10 @@
 QTextEdit {
-    background-color: #1b1f22;
-    border: 1px solid #6c757d;
-    border-radius: 6px;
-    padding: 2px;
+    background-color: #1e2227;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 4px;
 }
 
 QTextEdit[readOnly="true"] {
-    color: #6c757d;
+    color: #8b949e;
 }

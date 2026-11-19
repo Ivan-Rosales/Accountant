@@ -1,52 +1,82 @@
-from PySide6.QtWidgets import QVBoxLayout, QCheckBox
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
 
 from app.core.settings import settings
 from app.mixin.async_execution import AsyncExecutionMixin
-from app.widgets.common import spacer, QProgressButton
-from app.widgets.confirm_box import QConfirmMessageBox
+from app.widgets.card import card
+from app.widgets.common import QProgressButton
+from app.widgets.toast import toast
 from app.widgets.file_selector import QFilesSelector
+from app.widgets.loader import QLoadingOverlay
 from app.widgets.metrics import QMetrics
+from app.widgets.switch import QSwitchField
 from app.workers.month_summary import MonthSummaryWorker
 from base.tab import TabWidget
+from exceptions import ValidationException
+from execution.month_summary import NOMINA_IMPORTES, NOMINA_NETO
 from logger import logger
 
 
 class QMonthSummary(AsyncExecutionMixin, TabWidget):
     layout_class = QVBoxLayout
     tooltip_label = 'concentrado mensual'
+    page_title = 'Concentrado mensual'
+    page_subtitle = 'Genera el concentrado de ingresos o egresos a partir de los ZIP de facturas del SAT'
 
     worker_class = MonthSummaryWorker
+    busy_message = 'Generando concentrado...'
 
     def create_ui(self):
         self.selector = QFilesSelector(self, filter="*.zip")
-        self.prov_check = QCheckBox('Proveedores', self)
+        self.selector.setProperty('class', 'dropzone')
+        self.prov_check = QSwitchField(self, text='Generar también el reporte por proveedor')
+
+        self.rules = QLabel(self)
+        self.rules.setProperty('class', 'secondary')
+        self.rules.setWordWrap(True)
 
         self.metrics = QMetrics(self)
-        self.execute_btn = QProgressButton('ejecutar', self, fn=self.start_worker)
+        self.execute_btn = QProgressButton('generar concentrado', self, fn=self.start_worker)
         self.execute_btn.setProperty('class', 'primary')
+        self.execute_btn.setMinimumHeight(40)
 
         settings.register_setting(
             'check-providers',
             self.prov_check.isChecked,
-            lambda x: self.prov_check.setChecked(x == 'true'),
+            lambda x: self.prov_check.setChecked(x in ('true', True)),
             'false',
+            signal=self.prov_check.toggled,
         )
 
     def load_ui(self, layout):
-        layout.addItem(spacer)
-        layout.addWidget(self.selector)
-        layout.addWidget(self.prov_check)
-        layout.addItem(spacer)
+        frame, frame_layout = card(self, 'Archivos', 'Uno o varios ZIP descargados del SAT; uno por mes y tipo')
+        self.loader = QLoadingOverlay(frame)
+        frame_layout.addWidget(self.selector)
+        frame_layout.addWidget(self.prov_check)
+        frame_layout.addWidget(self.rules)
+        layout.addWidget(frame)
+        layout.addStretch(1)
 
-        layout.addWidget(self.metrics)
-        layout.addWidget(self.execute_btn)
+        footer = QHBoxLayout()
+        footer.addWidget(self.metrics, 1)
+        footer.addWidget(self.execute_btn, 2)
+        layout.addLayout(footer)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        importe = NOMINA_IMPORTES.get(settings.value('nomina-importe') or NOMINA_NETO)
+        self.rules.setText(f'Nóminas en egresos: {importe.lower()}. Se cambia en Configuración.')
 
     def validate_data(self):
         client = getattr(self.parent(), 'client_selector').get_current()
+        if client is None:
+            raise ValidationException('Seleccione un cliente')
         paths = self.selector.get_files()
+        if not paths:
+            raise ValidationException('Seleccione al menos un archivo ZIP')
 
         params = {
             'create_providers': self.prov_check.isChecked(),
+            'nomina_importe': settings.value('nomina-importe') or NOMINA_NETO,
         }
 
         return paths, client, params
@@ -59,6 +89,4 @@ class QMonthSummary(AsyncExecutionMixin, TabWidget):
         self.metrics.add_registers_today(n_files)
         self.selector.clear()
 
-        title = '¿Desea abrirlo?'
-        message = f'Se generó correctamente.\n{summary.filename}\n{title}'
-        QConfirmMessageBox(self, message, summary.startfile, title=title)
+        toast(self, 'Concentrado generado', detail=summary.filename.name, action=('Abrir', summary.startfile))

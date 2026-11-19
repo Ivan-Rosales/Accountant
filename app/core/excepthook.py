@@ -1,5 +1,4 @@
 import json
-import shutil
 import sys
 import traceback
 from dataclasses import dataclass, field
@@ -17,6 +16,15 @@ class Log:
     name: str
     data: dict
     files: list = field(default_factory=list)
+
+
+MAX_LOGS = 200
+
+
+def prune_logs(folder: Path, keep=MAX_LOGS):
+    logs = sorted(folder.glob('log_*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in logs[keep:]:
+        old.unlink(missing_ok=True)
 
 
 def except_hook(exc_type, exc_value, exc_traceback):
@@ -52,11 +60,11 @@ def except_hook(exc_type, exc_value, exc_traceback):
             'datetime': now.isoformat(),
         }
 
-        json.dump(full_log, log_file.open('w'))
+        # Solo se registran las rutas: no se copian ZIP/XML de clientes (datos fiscales) a la carpeta de logs
+        full_log['data']['files'] = [str(file) for file in log.files]
+        with log_file.open('w', encoding='utf-8') as file:
+            json.dump(full_log, file, ensure_ascii=False, indent=2, default=str)
 
-        for file in log.files:
-            log_file = log_file.with_suffix('') / file.name
-            log_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(file, log_file)
+        prune_logs(Path(LOGS_DIR))
 
     message.exec()

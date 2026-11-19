@@ -1,9 +1,14 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem
+from PySide6.QtWidgets import QTableWidget, QAbstractItemView, QTableWidgetItem, QHeaderView
 
 from app.mixin.model import ModelMixin
 from app.widgets.row_instance import QRowInstance
 from base.widget import BaseWidget
+
+
+def label_for(field):
+    label = (field.comment or field.name).replace('_', ' ')
+    return label if label.isupper() else label.capitalize()
 
 
 class QTableModel(ModelMixin, BaseWidget):
@@ -13,16 +18,28 @@ class QTableModel(ModelMixin, BaseWidget):
         'id': 0.2,
     }
 
+    windows_size = None
+
     def create_ui(self):
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(self.fields))
-        self.headers_labels = [(i.comment or i.name).capitalize() for i in self.fields]
+        self.headers_labels = [label_for(i) for i in self.fields]
         self.table.setHorizontalHeaderLabels(self.headers_labels)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        for column, field in enumerate(self.fields):
+            if field.name == 'id':
+                self.table.setColumnHidden(column, True)
+            elif field.name == 'rfc':
+                header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
         self.initial_resize = False
 
@@ -91,8 +108,3 @@ class QTableModel(ModelMixin, BaseWidget):
             instance = row_item.data(Qt.ItemDataRole.UserRole)
             self.model.delete(instance)
 
-    def showEvent(self, event):
-        if not self.initial_resize:
-            self.resize_columns()
-            self.initial_resize = True
-        super().showEvent(event)
