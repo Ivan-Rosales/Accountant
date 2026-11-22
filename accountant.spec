@@ -7,7 +7,7 @@ a = Analysis(
     datas=[
         ('dist/updater.exe', '.'),
         ('pyproject.toml', '.'),
-        ('assets/*', 'assets'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[],
     hookspath=[],
